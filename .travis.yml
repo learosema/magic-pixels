@@ -3,7 +3,6 @@ language: node_js
 node_js:
   - 14
   - 12
-
 jobs:
   include:
     # Define the release stage that runs semantic-release
@@ -12,8 +11,14 @@ jobs:
       # Advanced: optionally overwrite your default `script` step to skip the tests
       # script: skip
       deploy:
-        provider: script
-        skip_cleanup: true
-        script: npx semantic-release
-        on:
-          branch: main
+        - provider: script
+          skip_cleanup: true
+          script: npx semantic-release
+          on:
+            branch: main
+        - provider: pages
+          local_dir: docs
+          skip_cleanup: true
+          github_token: $GH_TOKEN
+          on:
+            branch: main
