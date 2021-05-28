@@ -17,6 +17,7 @@ jobs:
           on:
             branch: main
         - provider: script
+          skip_cleanup: true
           script: npm run build:docs
           on:
             branch: main
