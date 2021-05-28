@@ -29,7 +29,7 @@ This is actually a project by [Lea](https://github.com/terabaud), and she decide
 
 ## Getting started
 
-- First, add colorful pixels to your project via `npm install magic-pixels`.
+- First, add it to your project via `npm install magic-pixels`.
 - Add a `<canvas>` element to your DOM
 - Initialize the WebGL renderer
 - Add a resize event handler
