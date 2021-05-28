@@ -16,6 +16,10 @@ jobs:
           script: npx semantic-release
           on:
             branch: main
+        - provider: script
+          script: npm run build:docs
+          on:
+            branch: main
         - provider: pages
           local_dir: docs
           skip_cleanup: true
