@@ -1,4 +1,4 @@
-import { createPlaneGeometry } from '../geometries';
+import { createPlaneGeometry } from './plane';
 import { createIndexedGeometry } from './indexed-geometry';
 
 describe('createIndexedGeometry tests', () => {

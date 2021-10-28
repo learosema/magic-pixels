@@ -1,11 +1,6 @@
-import { clamp, mix } from './one-liners';
+import { clamp } from './clamp';
 
-describe('One liners tests', () => {
-  test('mix', () => {
-    expect(mix(1, 7, 0)).toBe(1);
-    expect(mix(1, 7, 0.5)).toBe(4);
-  });
-
+describe('clamp tests', () => {
   test('clamp', () => {
     expect(clamp(0, 1, 3)).toBe(1);
     expect(clamp(1, 1, 3)).toBe(1);

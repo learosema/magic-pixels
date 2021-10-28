@@ -1,8 +1,4 @@
-import {
-  BufferAttribute,
-  BufferGeometry,
-  createPlaneGeometry,
-} from '../geometries';
+import { BufferAttribute, BufferGeometry, createPlaneGeometry } from '.';
 import { mergeGeometries } from './merge-geometries';
 
 describe('mergeGeometries tests', () => {
