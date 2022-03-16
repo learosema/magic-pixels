@@ -7,7 +7,7 @@ As I left the company, development work will be continued in this fork.
 ## Why yet another WebGL library?
 
 To be honest, there really is no need to build our own 3D library. There are many of these already out there.
-This is actually a project by [Lea](https://github.com/terabaud), and she decided building something like that anyway, just in order to learn how all this works.
+This is actually a project by [Lea](https://github.com/learosema), and she decided building something like that anyway, just in order to learn how all this works.
 
 ## Features
 
@@ -25,7 +25,7 @@ This is actually a project by [Lea](https://github.com/terabaud), and she decide
 
 ## API documentation
 
-- https://terabaud.github.io/magic-pixels/
+- https://learosema.github.io/magic-pixels/
 
 ## Getting started
 
@@ -166,5 +166,5 @@ color.toVec4();
 
 Trigger Warning: these examples can cause sickness to people with motion sensitivities.
 
-- [Sinebox](https://codepen.io/terabaud/pen/LYxeYGX)
-- [A blob and a background](https://codepen.io/terabaud/pen/YzNEyqm)
+- [Sinebox](https://codepen.io/learosema/pen/LYxeYGX)
+- [A blob and a background](https://codepen.io/learosema/pen/YzNEyqm)
