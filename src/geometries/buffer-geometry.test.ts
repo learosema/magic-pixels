@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry } from '.';
+import { BufferAttribute, BufferGeometry } from './buffer-geometry';
 
 describe('BufferGeometry tests', () => {
   test('setAttribute create an attribute on the geometry', () => {

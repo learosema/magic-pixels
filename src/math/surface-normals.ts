@@ -1,4 +1,4 @@
-import { Vector } from './vector';
+import { Vector } from '../types';
 
 /**
  * Calculate the surface normal of a triangle

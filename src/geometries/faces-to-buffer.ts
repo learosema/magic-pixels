@@ -1,4 +1,4 @@
-import { Vector } from './vector';
+import { Vector } from '../types';
 
 /**
  * @param faces array of vertex indices containing 3 or 4 indices each for triangles/quads

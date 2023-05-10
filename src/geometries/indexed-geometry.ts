@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry } from '../geometries';
+import { BufferAttribute, BufferGeometry } from './buffer-geometry';
 
 /**
  * Create an indexed buffer geometry from a non-indexed one (might be expensive)

@@ -1,8 +1,6 @@
-import { Uniform, Uniforms } from '../webgl/material';
+import { Uniform, Uniforms } from '../types/material';
 import { Texture } from '../webgl/texture';
-import { Color } from './color';
-import { Matrix } from './matrix';
-import { Vector } from './vector';
+import { Color, Matrix, Vector } from '../types';
 
 function setUniformVector(
   gl: WebGLRenderingContext,

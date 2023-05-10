@@ -1,5 +1,5 @@
-import { facesToBuffer } from '../utils';
-import { Vector } from '../utils/vector';
+import { facesToBuffer } from './faces-to-buffer';
+import { Vector } from '../types';
 import { BufferAttribute, BufferGeometry } from './buffer-geometry';
 
 /**

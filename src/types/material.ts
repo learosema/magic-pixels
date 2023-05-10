@@ -1,5 +1,7 @@
-import { Texture } from '.';
-import { Vector, Matrix, Color } from '../utils';
+import { Texture } from '../webgl';
+import { Vector } from '../math/vector';
+import { Matrix } from '../math/matrix';
+import { Color } from './color';
 
 import defaultVertexShader from '../shaders/default.vert';
 import defaultFragmentShader from '../shaders/default.frag';
