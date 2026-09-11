@@ -1,8 +1,9 @@
 name: Release
 
-# Manually triggered: builds a released tag and stages it on npm via trusted
-# publishing (OIDC). The staged version only goes live after a maintainer
-# approves it on npmjs.com or with `npm stage approve`.
+# Builds a released tag and stages it on npm via trusted publishing (OIDC).
+# Dispatched automatically by release-please.yml when a release is created;
+# can also be run by hand to re-publish a tag. The staged version only goes
+# live after a maintainer approves it on npmjs.com or with `npm stage approve`.
 # The npm trusted publisher is bound to this file name, so keep it release.yml.
 
 on:
