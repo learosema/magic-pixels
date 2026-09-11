@@ -2,7 +2,7 @@
   "name": "magic-pixels",
   "version": "0.0.0-development",
   "description": "A WebGL library",
-  "repository": "terabaud/magic-pixels",
+  "repository": "learosema/magic-pixels",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
