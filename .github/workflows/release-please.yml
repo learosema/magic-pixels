@@ -1,0 +1,29 @@
+name: Release Please
+
+# Opens (and keeps updating) a release pull request with the version bump and
+# CHANGELOG. Merging that PR creates the git tag and the GitHub release.
+# Publishing to npm is a separate, manually triggered step: see release.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release pull request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create tags and GitHub releases
+      pull-requests: write # open and update the release PR
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          # Pull requests opened with the default token don't trigger CI.
+          # Set a RELEASE_PLEASE_TOKEN secret (fine-grained PAT with contents +
+          # pull-requests write) if you want checks to run on the release PR.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

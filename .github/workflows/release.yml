@@ -1,37 +1,65 @@
 name: Release
 
+# Manually triggered: builds a released tag and stages it on npm via trusted
+# publishing (OIDC). The staged version only goes live after a maintainer
+# approves it on npmjs.com or with `npm stage approve`.
+# The npm trusted publisher is bound to this file name, so keep it release.yml.
+
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to publish, e.g. v1.1.0. Defaults to the latest GitHub release.'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  release:
-    name: Publish to npm
+  publish:
+    name: Stage publish to npm
     runs-on: ubuntu-latest
+    # Must match the environment configured on the npm trusted publisher
+    environment: publishing
     permissions:
-      contents: write # create releases and tags
-      issues: write # comment on released issues
-      pull-requests: write # comment on released pull requests
-      id-token: write # npm provenance
+      contents: read
+      id-token: write # OIDC for npm trusted publishing and provenance
     steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${INPUT_TAG:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing $tag"
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          ref: ${{ steps.tag.outputs.tag }}
           persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: lts/*
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check package version matches tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$TAG" ]; then
+            echo "package.json version is $version but tag is $TAG" >&2
+            exit 1
+          fi
 
       - name: Lint
         run: npm run lint
@@ -42,9 +70,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-        run: npx semantic-release
+      - name: Stage publish
+        run: npm stage publish

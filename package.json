@@ -1,6 +1,6 @@
 {
   "name": "magic-pixels",
-  "version": "0.0.0-development",
+  "version": "1.0.1",
   "description": "A WebGL library",
   "repository": "learosema/magic-pixels",
   "type": "module",
@@ -33,8 +33,7 @@
     "build:js": "node build",
     "build:docs": "typedoc src/index.ts",
     "build": "rm -rf dist && npm run build:types -s && npm run build:js -s",
-    "prepublishOnly": "npm run lint -s && npm test -s && npm run build && npm run lint:pkg -s",
-    "semantic-release": "semantic-release"
+    "prepublishOnly": "npm run lint -s && npm test -s && npm run build && npm run lint:pkg -s"
   },
   "keywords": [
     "webgl",
@@ -44,17 +43,14 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@semantic-release/npm": "^13.1.5",
     "esbuild": "^0.28.2",
     "esbuild-plugin-glsl": "^1.4.2",
     "eslint": "^10.10.0",
     "prettier": "^3.9.6",
     "publint": "^0.3.24",
-    "semantic-release": "^25.0.9",
     "typedoc": "^0.28.20",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
-  },
-  "dependencies": {}
+  }
 }

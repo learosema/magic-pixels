@@ -168,3 +168,10 @@ Trigger Warning: these examples can cause sickness to people with motion sensiti
 
 - [Sinebox](https://codepen.io/learosema/pen/LYxeYGX)
 - [A blob and a background](https://codepen.io/learosema/pen/YzNEyqm)
+
+## Releasing
+
+Releases are cut in two steps, both driven from GitHub:
+
+1. Every push to `main` runs [release-please](https://github.com/googleapis/release-please), which opens or updates a release pull request with the version bump and `CHANGELOG.md`, based on [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` = minor, `fix:` = patch, `feat!:` or a `BREAKING CHANGE:` footer = major). Merging that PR creates the git tag and the GitHub release.
+2. Run the **Release** workflow manually from the Actions tab. It builds the tagged commit and stages it on npm via trusted publishing. The version becomes installable only after a maintainer approves it in the _Staged Packages_ tab on npmjs.com or with `npm stage approve`.
