@@ -1,8 +1,11 @@
 name: Release Please
 
 # Opens (and keeps updating) a release pull request with the version bump and
-# CHANGELOG. Merging that PR creates the git tag and the GitHub release.
-# Publishing to npm is a separate, manually triggered step: see release.yml.
+# CHANGELOG. Merging that PR creates the git tag and the GitHub release, after
+# which this workflow dispatches release.yml to stage the version on npm.
+#
+# The dispatch is needed because tags and releases created with GITHUB_TOKEN
+# do not trigger other workflows; workflow_dispatch is the exception.
 
 on:
   push:
@@ -18,8 +21,10 @@ jobs:
     permissions:
       contents: write # create tags and GitHub releases
       pull-requests: write # open and update the release PR
+      actions: write # dispatch release.yml once a release is created
     steps:
-      - uses: googleapis/release-please-action@v5
+      - id: release
+        uses: googleapis/release-please-action@v5
         with:
           # Pull requests opened with the default token don't trigger CI.
           # Set a RELEASE_PLEASE_TOKEN secret (fine-grained PAT with contents +
@@ -27,3 +32,10 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Stage publish to npm
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=$TAG"
