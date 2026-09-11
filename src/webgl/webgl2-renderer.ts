@@ -1,8 +1,11 @@
 import type { BufferGeometry } from '../geometries';
-import type { Material } from './material';
-import type { Mesh } from './mesh';
-import { Texture } from './texture';
+import type { Material } from '../scene/material';
+import type { Mesh } from '../scene/mesh';
+import type { Renderer } from '../scene/renderer';
+import { Texture } from '../scene/texture';
+import { usesMipmaps } from '../scene/constants';
 import { ERRORS } from './webgl-errors';
+import { GL_DRAW_MODE, GL_FILTER, GL_WRAPPING } from './gl-constants';
 import {
   getActiveUniforms,
   uniformToArray,
@@ -24,8 +27,9 @@ type MaterialResources = {
   uniforms: Map<string, UniformInfo>;
   /** last uploaded values per uniform name; unchanged values are skipped */
   state: Map<string, number[]>;
-  vertexShader: string;
-  fragmentShader: string;
+  /** the GLSL sources the program was compiled from */
+  vertex: string;
+  fragment: string;
 };
 
 type TextureResources = {
@@ -44,8 +48,6 @@ const RESERVED_ATTRIBUTE_LOCATIONS: [string, number][] = [
   ['uv', 2],
 ];
 
-const MIPMAP_FILTERS = new Set([0x2700, 0x2701, 0x2702, 0x2703]);
-
 function arraysEqual(a: number[], b: number[]): boolean {
   if (a.length !== b.length) {
     return false;
@@ -62,8 +64,9 @@ function arraysEqual(a: number[], b: number[]): boolean {
  * WebGL2 renderer. Owns every GPU resource: programs (one per material),
  * vertex array objects and buffers (one set per geometry) and textures.
  * Scene objects stay plain data and can be shared between meshes freely.
+ * Materials need a `glsl` shader source pair.
  */
-export class Renderer {
+export class WebGL2Renderer implements Renderer {
   gl: WebGL2RenderingContext;
   pixelRatio = 1;
 
@@ -89,7 +92,7 @@ export class Renderer {
    * @param scene the meshes to draw, in order
    * @returns this instance
    */
-  render(scene: Mesh[]): Renderer {
+  render(scene: Mesh[]): WebGL2Renderer {
     const { gl } = this;
     for (const { geometry, material } of scene) {
       const materialResources = this.getMaterialResources(material);
@@ -100,24 +103,25 @@ export class Renderer {
       }
       this.setUniforms(materialResources, material);
       gl.bindVertexArray(geometryResources.vao);
+      const mode = GL_DRAW_MODE[material.drawMode];
       if (geometry.index !== null) {
         const indexType =
           geometry.indexType === 32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
-        gl.drawElements(material.drawMode, geometry.count, indexType, 0);
+        gl.drawElements(mode, geometry.count, indexType, 0);
       } else {
-        gl.drawArrays(material.drawMode, 0, geometry.count);
+        gl.drawArrays(mode, 0, geometry.count);
       }
     }
     gl.bindVertexArray(null);
     return this;
   }
 
-  setPixelRatio(pixelRatio: number): Renderer {
+  setPixelRatio(pixelRatio: number): WebGL2Renderer {
     this.pixelRatio = pixelRatio;
     return this;
   }
 
-  setSize(width: number, height: number): Renderer {
+  setSize(width: number, height: number): WebGL2Renderer {
     const { gl, canvas, pixelRatio } = this;
     canvas.width = width * pixelRatio;
     canvas.height = height * pixelRatio;
@@ -165,25 +169,28 @@ export class Renderer {
   // ---------------------------------------------------------------- materials
 
   private getMaterialResources(material: Material): MaterialResources {
+    const { glsl } = material;
+    if (!glsl) {
+      throw Error(ERRORS.NO_GLSL);
+    }
     let resources = this.materials.get(material);
     if (
       resources &&
-      (resources.vertexShader !== material.vertexShader ||
-        resources.fragmentShader !== material.fragmentShader)
+      (resources.vertex !== glsl.vertex || resources.fragment !== glsl.fragment)
     ) {
       // shader source changed: recompile
       this.disposeMaterial(material);
       resources = undefined;
     }
     if (!resources) {
-      const { vertexShader, fragmentShader } = material;
-      const program = this.createProgram(vertexShader, fragmentShader);
+      const { vertex, fragment } = glsl;
+      const program = this.createProgram(vertex, fragment);
       resources = {
         program,
         uniforms: getActiveUniforms(this.gl, program),
         state: new Map(),
-        vertexShader,
-        fragmentShader,
+        vertex,
+        fragment,
       };
       this.materials.set(material, resources);
     }
@@ -320,10 +327,14 @@ export class Renderer {
     }
     gl.bindTexture(gl.TEXTURE_2D, resources.texture);
     if (texture.needsUpdate) {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, texture.minFilter);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, texture.magFilter);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, texture.wrapS);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, texture.wrapT);
+      const minFilter = GL_FILTER[texture.minFilter];
+      const magFilter = GL_FILTER[texture.magFilter];
+      const wrapS = GL_WRAPPING[texture.wrapS];
+      const wrapT = GL_WRAPPING[texture.wrapT];
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
@@ -332,7 +343,7 @@ export class Renderer {
         gl.UNSIGNED_BYTE,
         texture.image
       );
-      if (MIPMAP_FILTERS.has(texture.minFilter)) {
+      if (usesMipmaps(texture.minFilter)) {
         gl.generateMipmap(gl.TEXTURE_2D);
       }
       texture.needsUpdate = false;

@@ -1,32 +1,17 @@
+import { Filter, Wrapping } from './constants';
+
 const ERRORS = {
   LOADING_ERROR: 'Error loading image',
-};
-
-// GL enum values are fixed by the spec; using the literals avoids touching the
-// WebGL2RenderingContext global at import time (keeps the module loadable in Node).
-export const Wrapping: Record<string, number> = {
-  CLAMP_TO_EDGE: 0x812f,
-  REPEAT: 0x2901,
-  MIRRORED_REPEAT: 0x8370,
-};
-
-export const Filter: Record<string, number> = {
-  LINEAR: 0x2601,
-  NEAREST: 0x2600,
-  LINEAR_MIPMAP_LINEAR: 0x2703,
-  LINEAR_MIPMAP_NEAREST: 0x2701,
-  NEAREST_MIPMAP_LINEAR: 0x2702,
-  NEAREST_MIPMAP_NEAREST: 0x2700,
 };
 
 export type TextureData =
   HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | ImageData;
 
 export type TextureOptions = {
-  minFilter?: number;
-  magFilter?: number;
-  wrapS?: number;
-  wrapT?: number;
+  minFilter?: Filter;
+  magFilter?: Filter;
+  wrapS?: Wrapping;
+  wrapT?: Wrapping;
 };
 
 /**
@@ -34,10 +19,10 @@ export type TextureOptions = {
  * uploads it the first time it is used as a uniform and assigns texture units.
  */
 export class Texture {
-  minFilter = Filter.NEAREST;
-  magFilter = Filter.NEAREST;
-  wrapS = Wrapping.CLAMP_TO_EDGE;
-  wrapT = Wrapping.CLAMP_TO_EDGE;
+  minFilter: Filter = Filter.NEAREST;
+  magFilter: Filter = Filter.NEAREST;
+  wrapS: Wrapping = Wrapping.CLAMP_TO_EDGE;
+  wrapT: Wrapping = Wrapping.CLAMP_TO_EDGE;
   image: TextureData;
 
   /**

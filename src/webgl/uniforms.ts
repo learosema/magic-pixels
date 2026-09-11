@@ -1,5 +1,5 @@
-import type { Uniform } from './material';
-import { Texture } from './texture';
+import type { Uniform } from '../scene/material';
+import { Texture } from '../scene/texture';
 import { Color } from '../utils/color';
 import { Matrix } from '../utils/matrix';
 import { Vector } from '../utils/vector';

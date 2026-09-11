@@ -13,10 +13,11 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 
 - An API that is somewhat familiar to THREE
 - `Vector`, `Matrix` classes
-- a WebGL2 `Renderer` which renders `Mesh`es and owns all GPU resources (programs, vertex array objects, buffers, textures)
+- a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders `Mesh`es and owns all GPU resources (programs, vertex array objects, buffers, textures)
+- a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
-- a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, vertex and fragment shaders and a `drawMode`
-- the `drawMode` is one of `DrawMode.TRIANGLES`, `DrawMode.POINTS`, `DrawMode.LINES`...
+- a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
+- the `drawMode` is one of `DrawMode.TRIANGLES`, `DrawMode.POINTS`, `DrawMode.LINES`... (plain strings, no GL constants)
 - the `BufferGeometry` API is also similar to three.js
 - Helpers for creating orthographic, perspective projection matrices
 - A `Stopwatch` class for timing (like `performance.now()` but with the possibility to start/stop)
@@ -42,8 +43,18 @@ user-written shaders may use either GLSL ES 1.00 or 3.00.
 
 ```js
 const canvas = document.querySelector('canvas');
-const renderer = new Renderer(canvas);
+const renderer = new WebGL2Renderer(canvas);
 renderer.setSize(innerWidth, innerHeight);
+```
+
+`WebGL2Renderer` implements the `Renderer` interface (`render`, `setSize`, `setPixelRatio`, `dispose`).
+Code that only needs to render a scene can depend on the interface. For unit tests of scene code
+there is a `NullRenderer`, which needs no canvas and records the frames it was asked to render:
+
+```js
+const renderer = new NullRenderer();
+renderer.render([mesh]);
+renderer.lastFrame; // [mesh]
 ```
 
 ### Create a geometry
@@ -61,16 +72,19 @@ const sphereGeometry = createSphereGeometry(1, 1, 16, 16);
 
 ### Create a material
 
-A material contains a `vertexShader`, a `fragmentShader`, a `drawMode` and a `uniforms` object.
-A material is plain data: the renderer compiles one program per material (shared by every mesh using it)
-and uploads the uniforms on each draw, skipping values that did not change. Just assign to
-`material.uniforms.time = ...` (or mutate a `Vector` in place) and render.
+A material contains shader sources per shading language (`material.glsl = { vertex, fragment }`),
+a `drawMode` and a `uniforms` object. A material is plain data: the renderer compiles one program per
+material (shared by every mesh using it) and uploads the uniforms on each draw, skipping values that
+did not change. Just assign to `material.uniforms.time = ...` (or mutate a `Vector` in place) and
+render. Replacing `material.glsl.fragment` recompiles the program on the next render.
 
 The setter for a uniform is chosen from the type declared in the shader, so a `Vector` works for
 `vec2` and `ivec2` alike. A `Texture` uniform is uploaded on first use and bound to a texture unit
 by the renderer.
 
-The default drawMode is `DrawMode.TRIANGLES`, see [MDN:drawArrays](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays) for more options.
+The default drawMode is `DrawMode.TRIANGLES`. Draw modes, texture filters and wrapping modes are
+plain strings (`'triangles'`, `'linear'`, `'repeat'`, ...) rather than GL constants; the `DrawMode`,
+`Filter` and `Wrapping` objects list them. See [MDN:drawArrays](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays) for what the modes mean.
 
 ```js
 const material = createShaderMaterial(vertexShader, fragmentShader, {

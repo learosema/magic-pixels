@@ -5,10 +5,11 @@ import {
   createFakeWebGL2,
   type FakeWebGL2,
 } from '../test-utils/fake-webgl2';
-import { createShaderMaterial } from './material';
-import { Mesh } from './mesh';
-import { Renderer } from './renderer';
-import { Texture } from './texture';
+import { createShaderMaterial } from '../scene/material';
+import { Mesh } from '../scene/mesh';
+import { Texture } from '../scene/texture';
+import { DrawMode, Filter, Wrapping } from '../scene/constants';
+import { WebGL2Renderer } from './webgl2-renderer';
 
 const VERTEX_SHADER = `#version 300 es
 in vec3 position;
@@ -45,19 +46,38 @@ function createImage(): ImageData {
   return { width: 1, height: 1, data: new Uint8ClampedArray(4) } as ImageData;
 }
 
-describe('Renderer', () => {
+describe('WebGL2Renderer', () => {
   let gl: FakeWebGL2;
-  let renderer: Renderer;
+  let renderer: WebGL2Renderer;
 
   beforeEach(() => {
     gl = createFakeWebGL2();
-    renderer = new Renderer(createFakeCanvas(gl));
+    renderer = new WebGL2Renderer(createFakeCanvas(gl));
   });
 
   test('throws when no WebGL2 context is available', () => {
-    expect(() => new Renderer(createFakeCanvas(null))).toThrow(
+    expect(() => new WebGL2Renderer(createFakeCanvas(null))).toThrow(
       /WebGL2 context/
     );
+  });
+
+  test('throws when a material has no GLSL source', () => {
+    const mesh = new Mesh(createTriangle(), {
+      drawMode: DrawMode.TRIANGLES,
+      uniforms: {},
+    });
+    expect(() => renderer.render([mesh])).toThrow(/glsl/);
+  });
+
+  test('maps the draw mode to the GL constant', () => {
+    const material = createShaderMaterial(
+      VERTEX_SHADER,
+      FRAGMENT_SHADER,
+      {},
+      DrawMode.LINES
+    );
+    renderer.render([new Mesh(createTriangle(), material)]);
+    expect(gl.callsTo('drawArrays')[0].args).toEqual([gl.LINES, 0, 3]);
   });
 
   test('throws with the info log when a shader fails to compile', () => {
@@ -207,6 +227,23 @@ describe('Renderer', () => {
     expect(samplers).toEqual([[0], [1]]);
   });
 
+  test('maps filter and wrapping modes to GL constants', () => {
+    const map = new Texture(createImage(), {
+      minFilter: Filter.LINEAR_MIPMAP_LINEAR,
+      magFilter: Filter.LINEAR,
+      wrapS: Wrapping.REPEAT,
+      wrapT: Wrapping.MIRRORED_REPEAT,
+    });
+    const mesh = new Mesh(
+      createTriangle(),
+      createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, { map })
+    );
+    renderer.render([mesh]);
+    const params = gl.callsTo('texParameteri').map(({ args }) => args[2]);
+    expect(params).toEqual([0x2703, 0x2601, 0x2901, 0x8370]);
+    expect(gl.callsTo('generateMipmap')).toHaveLength(1);
+  });
+
   test('re-uploads a texture flagged with needsUpdate', () => {
     const map = new Texture(createImage());
     const mesh = new Mesh(
@@ -280,7 +317,7 @@ describe('Renderer', () => {
     const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
     const mesh = new Mesh(createTriangle(), material);
     renderer.render([mesh]);
-    material.fragmentShader = FRAGMENT_SHADER + '\n// changed';
+    material.glsl!.fragment = FRAGMENT_SHADER + '\n// changed';
     renderer.render([mesh]);
     expect(gl.created.programs).toBe(2);
     expect(gl.deleted.programs).toBe(1);
