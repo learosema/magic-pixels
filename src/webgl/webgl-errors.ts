@@ -1,5 +1,5 @@
 export const ERRORS = {
-  WEBGL_INIT: 'WebGL initialization failed',
+  WEBGL_INIT: 'WebGL2 context could not be created',
   SHADER_FAIL: 'Shader compile failed',
   WEBGL_ERROR: 'WebGL error',
 };

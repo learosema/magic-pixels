@@ -1,5 +1,4 @@
 import type { BufferGroup } from './geometries/buffer-geometry';
-import type { TextureOptions } from './webgl/texture';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -23,25 +22,30 @@ import {
   Mat4,
   Camera,
   perspective,
-  wrapUniforms,
-  setUniform,
   Color,
   mergeGeometries,
   createIndexedGeometry,
 } from './utils';
-import type { Uniform, Uniforms } from './utils';
 import {
   Texture,
   Mesh,
   Renderer,
   Filter,
   Wrapping,
+  DrawMode,
   createBasicMaterial,
   createDefaultMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  setUniform,
 } from './webgl';
-import type { TextureData, Material } from './webgl';
+import type {
+  TextureData,
+  TextureOptions,
+  Material,
+  Uniform,
+  Uniforms,
+} from './webgl';
 
 export type {
   Uniform,
@@ -65,10 +69,12 @@ export {
   Renderer,
   Filter,
   Wrapping,
+  DrawMode,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  setUniform,
 };
 export {
   Vector,
@@ -86,8 +92,6 @@ export {
   frustum,
   perspective,
   Stopwatch,
-  wrapUniforms,
-  setUniform,
   mergeGeometries,
   createIndexedGeometry,
 };
