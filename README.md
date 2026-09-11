@@ -13,10 +13,10 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 
 - An API that is somewhat familiar to THREE
 - `Vector`, `Matrix` classes
-- a `Renderer` which renders `Mesh`es
+- a WebGL2 `Renderer` which renders `Mesh`es and owns all GPU resources (programs, vertex array objects, buffers, textures)
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, vertex and fragment shaders and a `drawMode`
-- the `drawMode` is one of those WebGL constants `gl.TRIANGLES`, `gl.POINTS`, `gl.LINES`...
+- the `drawMode` is one of `DrawMode.TRIANGLES`, `DrawMode.POINTS`, `DrawMode.LINES`...
 - the `BufferGeometry` API is also similar to three.js
 - Helpers for creating orthographic, perspective projection matrices
 - A `Stopwatch` class for timing (like `performance.now()` but with the possibility to start/stop)
@@ -31,9 +31,12 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 
 - First, add it to your project via `npm install magic-pixels`.
 - Add a `<canvas>` element to your DOM
-- Initialize the WebGL renderer
+- Initialize the WebGL2 renderer
 - Add a resize event handler
 - create a scene, consisting of Meshes (a scene is an array of meshes)
+
+magic-pixels requires a WebGL2 context. The built-in shaders are written in GLSL ES 3.00;
+user-written shaders may use either GLSL ES 1.00 or 3.00.
 
 ### Initialize Renderer
 
@@ -59,9 +62,15 @@ const sphereGeometry = createSphereGeometry(1, 1, 16, 16);
 ### Create a material
 
 A material contains a `vertexShader`, a `fragmentShader`, a `drawMode` and a `uniforms` object.
-When a mesh is initialized, the `uniforms` object is wrapped by a ES6 Proxy, so the state in the gl context is automatically updated.
+A material is plain data: the renderer compiles one program per material (shared by every mesh using it)
+and uploads the uniforms on each draw, skipping values that did not change. Just assign to
+`material.uniforms.time = ...` (or mutate a `Vector` in place) and render.
 
-The default drawMode is `gl.TRIANGLES`, see [MDN:drawArrays](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays) for more options.
+The setter for a uniform is chosen from the type declared in the shader, so a `Vector` works for
+`vec2` and `ivec2` alike. A `Texture` uniform is uploaded on first use and bound to a texture unit
+by the renderer.
+
+The default drawMode is `DrawMode.TRIANGLES`, see [MDN:drawArrays](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays) for more options.
 
 ```js
 const material = createShaderMaterial(vertexShader, fragmentShader, {
@@ -90,6 +99,67 @@ const scene = [mesh];
 
 // render:
 renderer.render(scene);
+```
+
+### Writing shaders
+
+Attribute locations are fixed by name, so no `layout(location = ...)` qualifiers are needed and
+one geometry works with any program: `position` is location 0, `normal` is 1, `uv` is 2 and
+custom attributes get the next free location in the order the renderer first sees them.
+
+```glsl
+#version 300 es
+precision highp float;
+in vec4 position;
+in vec2 uv;
+uniform mat4 projectionMatrix;
+out vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * position;
+}
+```
+
+### Textures
+
+```js
+const texture = await Texture.fromImageUrl('image.png', {
+  minFilter: Filter.LINEAR,
+  magFilter: Filter.LINEAR,
+  wrapS: Wrapping.REPEAT,
+  wrapT: Wrapping.REPEAT,
+});
+material.uniforms.map = texture;
+
+// for video or canvas textures, flag the texture after the image changed:
+texture.needsUpdate = true;
+```
+
+### Updating geometry
+
+Write into an attribute's `data` and flag it; the renderer re-uploads it with `bufferSubData`
+on the next render. Adding or removing attributes or calling `setIndex` bumps
+`geometry.version`, which makes the renderer rebuild its buffers.
+
+```js
+const { position } = geometry.attributes;
+position.data[0] += 0.1;
+position.needsUpdate = true;
+// hint for frequently changing data (DYNAMIC_DRAW):
+position.dynamic = true;
+```
+
+### Freeing GPU resources
+
+GPU resources live as long as the renderer, or until you dispose them.
+Rendering an object again after disposing it recreates its resources.
+
+```js
+renderer.dispose(geometry); // buffers and VAO of one geometry
+renderer.dispose(material); // the program of one material
+renderer.dispose(texture); // one texture
+renderer.dispose(); // everything; loses the context
 ```
 
 ### Camera

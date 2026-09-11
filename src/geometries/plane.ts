@@ -40,10 +40,10 @@ export function createPlaneGeometry(
       // each square consists of 2 triangles
       const ix = i % cols;
       const iy = (i / cols) | 0;
-      const idx = iy * rows1 + ix;
+      const idx = iy * cols1 + ix;
       return [
-        [idx, idx + 1, idx + rows1],
-        [idx + 1, idx + rows1 + 1, idx + rows1],
+        [idx, idx + 1, idx + cols1],
+        [idx + 1, idx + cols1 + 1, idx + cols1],
       ];
     })
     .flat(1);

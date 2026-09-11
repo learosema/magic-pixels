@@ -1,17 +1,19 @@
 import { Filter, Texture, Wrapping } from './texture';
-import type { TextureData } from './texture';
+import type { TextureData, TextureOptions } from './texture';
 
 import { Mesh } from './mesh';
 import { Renderer } from './renderer';
 import {
+  DrawMode,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
 } from './material';
-import type { Material } from './material';
+import type { Material, Uniform, Uniforms } from './material';
+import { setUniform } from './uniforms';
 
-export type { TextureData, Material };
+export type { TextureData, TextureOptions, Material, Uniform, Uniforms };
 
 export {
   Texture,
@@ -19,8 +21,10 @@ export {
   Renderer,
   Filter,
   Wrapping,
+  DrawMode,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  setUniform,
 };

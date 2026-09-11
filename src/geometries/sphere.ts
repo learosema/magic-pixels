@@ -1,9 +1,8 @@
-import { facesToBuffer } from '../utils';
 import { Vector } from '../utils/vector';
 import { BufferAttribute, BufferGeometry } from './buffer-geometry';
 
 /**
- * Create sphere geometry
+ * Create an indexed sphere geometry
  * @param r radius
  * @param sides number of sides (around the sphere)
  * @param segments number of segments (from top to bottom)
@@ -15,8 +14,8 @@ export function createSphereGeometry(
 ): BufferGeometry {
   const vertices: Vector[] = [];
   const normals: Vector[] = [];
-  const texCoords = [];
-  const faces = [];
+  const texCoords: Vector[] = [];
+  const faces: number[][] = [];
 
   const dphi = 360 / sides;
   const dtheta = 180 / segments;
@@ -71,12 +70,14 @@ export function createSphereGeometry(
       }
     }
   }
+  // shared vertices with an index buffer; the seam (side === sides) and the
+  // poles keep their own vertices so uvs stay continuous.
   const geometry = new BufferGeometry();
-  const positionData = new Float32Array(facesToBuffer(faces, vertices));
-  const normalData = new Float32Array(facesToBuffer(faces, normals));
-  const uvData = new Float32Array(facesToBuffer(faces, texCoords));
-  geometry.setAttribute('position', new BufferAttribute(positionData, 3));
-  geometry.setAttribute('normal', new BufferAttribute(normalData, 3));
-  geometry.setAttribute('uv', new BufferAttribute(uvData, 2));
+  const toBuffer = (list: Vector[]) =>
+    new Float32Array(list.flatMap((v) => v.toArray()));
+  geometry.setAttribute('position', new BufferAttribute(toBuffer(vertices), 3));
+  geometry.setAttribute('normal', new BufferAttribute(toBuffer(normals), 3));
+  geometry.setAttribute('uv', new BufferAttribute(toBuffer(texCoords), 2));
+  geometry.setIndex(faces.flat(), vertices.length > 65535 ? 32 : 16);
   return geometry;
 }

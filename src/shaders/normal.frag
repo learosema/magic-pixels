@@ -1,12 +1,13 @@
+#version 300 es
 precision highp float;
-varying vec4 vPosition;
-varying vec4 vNormal;
-varying vec2 vUv;
-varying float vFaceIndex;
+in vec4 vPosition;
+in vec4 vNormal;
+in vec2 vUv;
 uniform float time;
 uniform vec2 resolution;
+out vec4 fragColor;
 
 void main() {
   vec3 color = vec3(vNormal.x, vNormal.y, 1.);
-  gl_FragColor = vec4(color,1.);
+  fragColor = vec4(color,1.);
 }

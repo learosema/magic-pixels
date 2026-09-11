@@ -1,10 +1,11 @@
+#version 300 es
 precision highp float;
-attribute vec4 position;
-attribute vec4 normal;
-attribute vec2 uv;
-varying vec4 vPosition;
-varying vec2 vUv;
-varying vec4 vNormal;
+in vec4 position;
+in vec4 normal;
+in vec2 uv;
+out vec4 vPosition;
+out vec2 vUv;
+out vec4 vNormal;
 
 void main() {
   vUv = uv;
