@@ -33,6 +33,17 @@ from [Conventional Commits](https://www.conventionalcommits.org/).
 - `createPlaneGeometry` computed face indices with the row stride instead of the column stride and produced wrong triangles unless `rows === cols`
 - shader compile and link errors are thrown as `Error` instances with the info log instead of bare strings
 
+## [3.0.0](https://github.com/learosema/magic-pixels/compare/v2.0.0...v3.0.0) (2026-09-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renderer is now an interface; the class is WebGL2Renderer. material.vertexShader/fragmentShader moved to material.glsl.vertex/fragment. DrawMode, Filter and Wrapping are string values ('triangles', 'linear', 'repeat', ...) instead of GL constants; DrawMode.TRIANGLES etc. still work.
+
+### Features
+
+* abstract renderer to an interface for future webgpu extension ([34f383f](https://github.com/learosema/magic-pixels/commit/34f383f2017bd4676b7bf7e253b840b0c96a00b8))
+
 ## [2.0.0](https://github.com/learosema/magic-pixels/compare/v1.1.0...v2.0.0) (2026-09-11)
 
 
