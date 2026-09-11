@@ -12,14 +12,16 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 ## Features
 
 - An API that is somewhat familiar to THREE
-- `Vector`, `Matrix` classes
-- a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders `Mesh`es and owns all GPU resources (programs, vertex array objects, buffers, textures)
+- `Vector`, `Matrix` classes, plus `Float32Array`-backed `Mat2`, `Mat3`, `Mat4` for transforms
+- a scene graph: `Object3D` with `position`, `rotation`, `scale`, `children`; `Scene`, `Mesh` and the cameras (`PerspectiveCamera`, `OrthographicCamera`) are `Object3D`s
+- a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders a `Scene` through a `Camera` and owns all GPU resources (programs, vertex array objects, buffers, textures)
+- built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
 - the `drawMode` is one of `DrawMode.TRIANGLES`, `DrawMode.POINTS`, `DrawMode.LINES`... (plain strings, no GL constants)
 - the `BufferGeometry` API is also similar to three.js
-- Helpers for creating orthographic, perspective projection matrices
+- Helpers for creating orthographic, perspective projection and look-at matrices
 - A `Stopwatch` class for timing (like `performance.now()` but with the possibility to start/stop)
 - One-Liners (`mix`, `clamp`)
 - Basic geometries (plane geometry, box geometry, sphere geometry and a custom geometry)
@@ -34,7 +36,8 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - Add a `<canvas>` element to your DOM
 - Initialize the WebGL2 renderer
 - Add a resize event handler
-- create a scene, consisting of Meshes (a scene is an array of meshes)
+- create a `Scene`, add `Mesh`es to it, and a `Camera`
+- render the scene through the camera
 
 magic-pixels requires a WebGL2 context. The built-in shaders are written in GLSL ES 3.00;
 user-written shaders may use either GLSL ES 1.00 or 3.00.
@@ -53,8 +56,8 @@ there is a `NullRenderer`, which needs no canvas and records the frames it was a
 
 ```js
 const renderer = new NullRenderer();
-renderer.render([mesh]);
-renderer.lastFrame; // [mesh]
+renderer.render(scene, camera);
+renderer.lastFrame.meshes; // the visible meshes, in draw order
 ```
 
 ### Create a geometry
@@ -107,13 +110,56 @@ const normalMaterial = createNormalMaterial();
 
 ```js
 const mesh = new Mesh(geometry, material);
+mesh.position.set(0, 0, -5);
 
-// currently, the scene is just an array of meshes:
-const scene = [mesh];
+const scene = new Scene();
+scene.add(mesh);
+
+const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
 
 // render:
-renderer.render(scene);
+renderer.render(scene, camera);
 ```
+
+The renderer clears color and depth before drawing (`renderer.autoClear = false` to keep the
+previous frame, `renderer.setClearColor('#202020')` to change the color) and draws with depth
+testing enabled.
+
+### Scene graph
+
+`Scene`, `Mesh` and the cameras extend `Object3D`. Every object has a `position`, a `rotation`
+(Euler angles in radians, applied in XYZ order) and a `scale` relative to its parent, and a list of
+`children`. Before each render, the renderer walks the tree and computes every object's
+`worldMatrix` as `parent.worldMatrix × localMatrix`.
+
+A child inherits its parent's transform, so it orbits when the parent rotates:
+
+```js
+const planet = new Mesh(sphereGeometry, material);
+const moon = new Mesh(smallSphereGeometry, material);
+planet.add(moon);
+moon.position.set(2, 0, 0);
+scene.add(planet);
+
+function frame(dt) {
+  planet.rotation.y += dt; // spins the planet and carries the moon around
+}
+```
+
+To orbit the moon without spinning the planet, put an empty `Object3D` in between as a pivot:
+
+```js
+const pivot = new Object3D();
+planet.add(pivot);
+pivot.add(moon);
+pivot.rotation.y += dt; // only the pivot (and the moon with it) rotates
+```
+
+Other useful bits: `object.visible = false` hides an object and its children,
+`object.traverse(callback)` visits a subtree, `object.lookAt(target)` points the object's +Z axis
+(for cameras: the viewing direction, -Z) at a point given in the parent's coordinate system.
+To drive `localMatrix` yourself, set `matrixAutoUpdate = false` and flag changes with
+`worldMatrixNeedsUpdate = true`.
 
 ### Writing shaders
 
@@ -121,17 +167,27 @@ Attribute locations are fixed by name, so no `layout(location = ...)` qualifiers
 one geometry works with any program: `position` is location 0, `normal` is 1, `uv` is 2 and
 custom attributes get the next free location in the order the renderer first sees them.
 
+The renderer sets the built-in uniforms `modelMatrix`, `viewMatrix`, `projectionMatrix`,
+`modelViewMatrix` (all `mat4`) and `normalMatrix` (`mat3`, the inverse transpose of the model-view
+matrix) for every shader that declares them, unless the material defines a uniform of the same
+name. The built-in vertex shader uses `modelViewMatrix`, `projectionMatrix` and `normalMatrix`.
+
 ```glsl
 #version 300 es
 precision highp float;
-in vec4 position;
+in vec3 position;
+in vec3 normal;
 in vec2 uv;
+uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
 out vec2 vUv;
+out vec3 vNormal;
 
 void main() {
   vUv = uv;
-  gl_Position = projectionMatrix * position;
+  vNormal = normalMatrix * normal;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 ```
 
@@ -178,33 +234,26 @@ renderer.dispose(); // everything; loses the context
 
 ### Camera
 
-```js
-const camera = new Camera();
-camera.position.set(0, 0, 5);
-camera.target.set(0, -0.5, 0);
-camera.update();
-console.log('camera matrix:', camera.cameraMatrix);
-console.log('view matrix:', camera.viewMatrix);
-// the view matrix is the inverse of the camera matrix
-// you can pass these into the material.uniforms object.
-```
-
-### Perspective projection
-
-The camera (currently) does not do projection by itself, but you can create a perspective projection matrix:
+A camera is an `Object3D` with a `projectionMatrix`. Place it like any other object; its
+`viewMatrix` (the inverse of its world matrix) is computed when the scene is rendered. A camera can
+also be a child of another object, e.g. a pivot to orbit it around a point.
 
 ```js
-const fieldOfView = 70;
-const aspectRatio = innerWidth / innerHeight;
-const near = 0.01;
-const far = 100;
-material.uniforms.projectionMatrix = perspective(
-  fieldOfView,
-  aspectRatio,
-  near,
-  far
-);
+const camera = new PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(0, 2, 5);
+camera.lookAt(new Vector(0, 0, 0));
+
+// on resize:
+camera.aspect = innerWidth / innerHeight;
+camera.updateProjectionMatrix();
+
+// parallel projection:
+const ortho = new OrthographicCamera(-2, 2, 1, -1, 0.1, 100);
 ```
+
+The projection helpers `perspective`, `frustum` and `ortho` (returning a `Matrix`) and their
+`Mat4` counterparts (`Mat4.perspective(...)`) are still available if you want to pass matrices
+through your own uniforms.
 
 ### Vector/matrix arithmetics
 
@@ -218,19 +267,28 @@ const c = a.cross(b);
 const d = a.add(b);
 ```
 
-### Create translation Matrices
+### Transformation matrices
+
+`Mat2`, `Mat3` and `Mat4` are fixed-size, `Float32Array`-backed matrices in column-major order
+(ready to be uploaded as uniforms). Their operations work in place and allocate nothing, which is
+what the scene graph uses per frame. `Matrix` remains the general-purpose class; convert with
+`mat4.toMatrix()` and `Mat4.fromMatrix(matrix)`.
 
 ```js
 // identity matrix
 const identity = Mat4.identity();
 // translate object in space
 const translationMatrix = Mat4.translation(tx, ty, tz);
-// rotation matrix
+// rotation matrix, composed in place
 const DEG = Math.PI / 180;
-const rX = Mat4.rotX(30 * DEG);
-const rZ = Mat4.rotY(45 * DEG);
-const rZ = Mat4.rotZ(-5 * DEG);
-const rotationMatrix = rX.mul(rY).mul(rZ);
+const rotationMatrix = Mat4.rotX(30 * DEG)
+  .multiply(Mat4.rotY(45 * DEG))
+  .multiply(Mat4.rotZ(-5 * DEG));
+// translation × rotation (Euler XYZ) × scale, as used by Object3D
+const model = new Mat4().compose(position, rotation, scale);
+const inverse = model.clone().invert();
+// normal matrix for a model(-view) matrix
+const normalMatrix = new Mat3().setNormalMatrix(model);
 ```
 
 ### Color helper

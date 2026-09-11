@@ -1,6 +1,6 @@
 import { Vector } from './vector';
 import { Matrix } from './matrix';
-import * as Mat4 from './mat4';
+import { Mat4 } from './mat4';
 
 describe('generic matrix arithmetics', () => {
   test('2x3 matrix initialization', () => {
@@ -181,9 +181,9 @@ describe('generic matrix arithmetics', () => {
   });
 
   test('Mat4 multiplication and division', () => {
-    const a = Mat4.identity();
-    const b = Mat4.translation(-1, -2, -3);
-    const c = Mat4.scaling(2, 4, 6);
+    const a = Matrix.identity(4);
+    const b = Mat4.translation(-1, -2, -3).toMatrix();
+    const c = Mat4.scaling(2, 4, 6).toMatrix();
     const d = a.mul(b) as Matrix;
     expect(d.equals(b)).toBeTruthy();
     const e = d.mul(c) as Matrix;

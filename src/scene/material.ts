@@ -1,5 +1,5 @@
 import type { Texture } from './texture';
-import type { Vector, Matrix } from '../utils';
+import type { Vector, Matrix, Mat2, Mat3, Mat4 } from '../utils';
 import { Color } from '../utils';
 import { DrawMode } from './constants';
 
@@ -17,6 +17,9 @@ export type Uniform =
   | Texture
   | Vector
   | Matrix
+  | Mat2
+  | Mat3
+  | Mat4
   | Color;
 export type Uniforms = Record<string, Uniform>;
 

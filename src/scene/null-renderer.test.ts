@@ -1,18 +1,47 @@
 import { BufferGeometry } from '../geometries';
+import { Color } from '../utils';
+import { PerspectiveCamera } from './camera';
 import { createDefaultMaterial } from './material';
 import { Mesh } from './mesh';
 import { NullRenderer } from './null-renderer';
+import { Object3D } from './object3d';
 import type { Renderer } from './renderer';
+import { Scene } from './scene';
 
 describe('NullRenderer', () => {
-  test('records rendered frames', () => {
+  test('records rendered frames with the visible meshes in draw order', () => {
     const renderer: Renderer = new NullRenderer();
-    const mesh = new Mesh(new BufferGeometry(), createDefaultMaterial());
-    renderer.render([mesh]);
-    renderer.render([mesh, mesh]);
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    const group = new Object3D();
+    const a = new Mesh(new BufferGeometry(), createDefaultMaterial());
+    const b = new Mesh(new BufferGeometry(), createDefaultMaterial());
+    const hidden = new Mesh(new BufferGeometry(), createDefaultMaterial());
+    hidden.visible = false;
+    group.add(a, hidden);
+    scene.add(group, b);
+
+    renderer.render(scene, camera);
+    b.visible = false;
+    renderer.render(scene, camera);
+
     const { frames, lastFrame } = renderer as NullRenderer;
-    expect(frames).toEqual([[mesh], [mesh, mesh]]);
-    expect(lastFrame).toEqual([mesh, mesh]);
+    expect(frames.map((frame) => frame.meshes)).toEqual([[a, b], [a]]);
+    expect(lastFrame).toEqual({ scene, camera, meshes: [a] });
+  });
+
+  test('updates the world matrices like a real renderer', () => {
+    const renderer = new NullRenderer();
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    const mesh = new Mesh(new BufferGeometry(), createDefaultMaterial());
+    mesh.position.set(1, 2, 3);
+    camera.position.set(0, 0, 5);
+    scene.add(mesh);
+
+    renderer.render(scene, camera);
+    expect(mesh.worldMatrix.toArray().slice(12)).toEqual([1, 2, 3, 1]);
+    expect(camera.viewMatrix.toArray().slice(12)).toEqual([0, 0, -5, 1]);
   });
 
   test('applies the pixel ratio to setSize', () => {
@@ -21,6 +50,14 @@ describe('NullRenderer', () => {
     renderer.setSize(100, 50);
     expect(renderer.width).toBe(200);
     expect(renderer.height).toBe(100);
+  });
+
+  test('records the clear color', () => {
+    const renderer = new NullRenderer();
+    renderer.setClearColor('#ff0000');
+    expect(renderer.clearColor).toEqual([1, 0, 0, 1]);
+    renderer.setClearColor(new Color(0, 255, 0), 0.5);
+    expect(renderer.clearColor).toEqual([0, 1, 0, 0.5]);
   });
 
   test('records disposed objects', () => {
