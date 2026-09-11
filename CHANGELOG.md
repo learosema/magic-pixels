@@ -33,6 +33,17 @@ from [Conventional Commits](https://www.conventionalcommits.org/).
 - `createPlaneGeometry` computed face indices with the row stride instead of the column stride and produced wrong triangles unless `rows === cols`
 - shader compile and link errors are thrown as `Error` instances with the info log instead of bare strings
 
+## [4.0.0](https://github.com/learosema/magic-pixels/compare/v3.0.0...v4.0.0) (2026-09-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* New Camera classes PerspectiveCamera/OrthographicCamera, Mesh now extends Object3D, render(scene, camera) on the renderer interface; prepareScene() to filter the scene for visible objects in the seen
+
+### Features
+
+* scene graph and coordinate system ([404a4fb](https://github.com/learosema/magic-pixels/commit/404a4fb6ef28b82143fb15e07ef953aa5f512f8b))
+
 ## [3.0.0](https://github.com/learosema/magic-pixels/compare/v2.0.0...v3.0.0) (2026-09-11)
 
 
