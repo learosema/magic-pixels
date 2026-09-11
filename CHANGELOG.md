@@ -33,6 +33,17 @@ from [Conventional Commits](https://www.conventionalcommits.org/).
 - `createPlaneGeometry` computed face indices with the row stride instead of the column stride and produced wrong triangles unless `rows === cols`
 - shader compile and link errors are thrown as `Error` instances with the info log instead of bare strings
 
+## [2.0.0](https://github.com/learosema/magic-pixels/compare/v1.1.0...v2.0.0) (2026-09-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* built-in shaders migrated to version 300 es
+
+### Features
+
+* decoupled scene from gpu code, moved solely to renderer ([5d2f555](https://github.com/learosema/magic-pixels/commit/5d2f555fa33ebdd3c526ba477670c62991134c09))
+
 ## [1.1.0](https://github.com/learosema/magic-pixels/compare/v1.0.1...v1.1.0) (2026-09-11)
 
 ### Features
