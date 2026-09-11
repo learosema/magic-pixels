@@ -1,30 +1,5 @@
-import { Filter, Texture, Wrapping } from './texture';
-import type { TextureData, TextureOptions } from './texture';
-
-import { Mesh } from './mesh';
-import { Renderer } from './renderer';
-import {
-  DrawMode,
-  createDefaultMaterial,
-  createBasicMaterial,
-  createNormalMaterial,
-  createShaderMaterial,
-} from './material';
-import type { Material, Uniform, Uniforms } from './material';
+import { WebGL2Renderer } from './webgl2-renderer';
 import { setUniform } from './uniforms';
+import { GL_DRAW_MODE, GL_FILTER, GL_WRAPPING } from './gl-constants';
 
-export type { TextureData, TextureOptions, Material, Uniform, Uniforms };
-
-export {
-  Texture,
-  Mesh,
-  Renderer,
-  Filter,
-  Wrapping,
-  DrawMode,
-  createDefaultMaterial,
-  createBasicMaterial,
-  createNormalMaterial,
-  createShaderMaterial,
-  setUniform,
-};
+export { WebGL2Renderer, setUniform, GL_DRAW_MODE, GL_FILTER, GL_WRAPPING };

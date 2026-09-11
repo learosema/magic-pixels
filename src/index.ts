@@ -29,7 +29,7 @@ import {
 import {
   Texture,
   Mesh,
-  Renderer,
+  NullRenderer,
   Filter,
   Wrapping,
   DrawMode,
@@ -37,22 +37,26 @@ import {
   createDefaultMaterial,
   createNormalMaterial,
   createShaderMaterial,
-  setUniform,
-} from './webgl';
+} from './scene';
 import type {
+  Renderer,
   TextureData,
   TextureOptions,
   Material,
+  ShaderSource,
   Uniform,
   Uniforms,
-} from './webgl';
+} from './scene';
+import { WebGL2Renderer, setUniform } from './webgl';
 
 export type {
+  Renderer,
   Uniform,
   Uniforms,
   TextureData,
   TextureOptions,
   Material,
+  ShaderSource,
   BufferGroup,
 };
 
@@ -66,7 +70,8 @@ export {
 export {
   Texture,
   Mesh,
-  Renderer,
+  NullRenderer,
+  WebGL2Renderer,
   Filter,
   Wrapping,
   DrawMode,
