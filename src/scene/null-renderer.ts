@@ -1,32 +1,47 @@
 import type { BufferGeometry } from '../geometries';
+import { Color } from '../utils';
+import type { Camera } from './camera';
 import type { Material } from './material';
 import type { Mesh } from './mesh';
+import { prepareScene } from './renderer';
 import type { Renderer } from './renderer';
+import type { Scene } from './scene';
 import type { Texture } from './texture';
 
+/** What a `NullRenderer` records per `render` call */
+export type NullFrame = {
+  scene: Scene;
+  camera: Camera;
+  /** the visible meshes, in the order a renderer would draw them */
+  meshes: Mesh[];
+};
+
 /**
- * A renderer that draws nothing and needs no canvas. It records what it was
- * asked to do so scene code can be tested without a GPU.
+ * A renderer that draws nothing and needs no canvas. It updates the world
+ * matrices like a real renderer and records what it was asked to do, so
+ * scene code can be tested without a GPU.
  */
 export class NullRenderer implements Renderer {
   width = 0;
   height = 0;
   pixelRatio = 1;
+  /** clear color as `[r, g, b, a]` in the range 0..1 */
+  clearColor = [0, 0, 0, 1];
 
   /** every `render` call, in order */
-  frames: Mesh[][] = [];
+  frames: NullFrame[] = [];
   /** every object passed to `dispose(object)` */
   disposed: (BufferGeometry | Material | Texture)[] = [];
   /** true after `dispose()` without an argument */
   isDisposed = false;
 
-  /** meshes of the most recent `render` call */
-  get lastFrame(): Mesh[] | undefined {
+  /** the most recent `render` call */
+  get lastFrame(): NullFrame | undefined {
     return this.frames[this.frames.length - 1];
   }
 
-  render(scene: Mesh[]): void {
-    this.frames.push([...scene]);
+  render(scene: Scene, camera: Camera): void {
+    this.frames.push({ scene, camera, meshes: prepareScene(scene, camera) });
   }
 
   setSize(width: number, height: number): void {
@@ -36,6 +51,13 @@ export class NullRenderer implements Renderer {
 
   setPixelRatio(pixelRatio: number): void {
     this.pixelRatio = pixelRatio;
+  }
+
+  setClearColor(color: Color | string, alpha?: number): void {
+    const [r, g, b, a] = (
+      typeof color === 'string' ? Color.fromHex(color) : color
+    ).toVec4();
+    this.clearColor = [r, g, b, alpha ?? a];
   }
 
   dispose(object?: BufferGeometry | Material | Texture): void {

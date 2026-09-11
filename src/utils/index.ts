@@ -3,16 +3,14 @@ import { facesToBuffer } from './faces-to-buffer';
 import { calculateSurfaceNormal } from './surface-normals';
 import { Vector } from './vector';
 import { Matrix } from './matrix';
+import { Mat2 } from './mat2';
+import { Mat3 } from './mat3';
+import { Mat4 } from './mat4';
 import { mix, clamp } from './one-liners';
 import { Stopwatch } from './stopwatch';
 import { ortho, frustum, perspective } from './perspective';
-import { Camera } from './camera';
 import { createIndexedGeometry } from './indexed-geometry';
 import { mergeGeometries } from './merge-geometries';
-
-import * as Mat2 from './mat2';
-import * as Mat3 from './mat3';
-import * as Mat4 from './mat4';
 
 export {
   Vector,
@@ -29,7 +27,6 @@ export {
   perspective,
   Stopwatch,
   Color,
-  Camera,
   mergeGeometries,
   createIndexedGeometry,
 };

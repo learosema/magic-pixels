@@ -1,6 +1,7 @@
 import type { Uniform } from '../scene/material';
 import { Texture } from '../scene/texture';
 import { Color } from '../utils/color';
+import { Float32Matrix } from '../utils/float32-matrix';
 import { Matrix } from '../utils/matrix';
 import { Vector } from '../utils/vector';
 
@@ -13,12 +14,19 @@ export type UniformInfo = {
   size: number;
 };
 
+/** A flattened uniform value; matrices come as `Float32Array` */
+export type UniformValues = number[] | Float32Array;
+
 type Upload = (
   gl: WebGL2RenderingContext,
   loc: WebGLUniformLocation,
-  v: number[],
+  v: UniformValues,
   n: number
 ) => void;
+
+/** integer setters take an `Int32List`; only matrix values are typed arrays */
+const ints = (v: UniformValues): number[] =>
+  Array.isArray(v) ? v : Array.from(v);
 
 // GL type enum -> [components per element, upload function].
 // The shader's declared type picks the setter, so a `Vector` works for
@@ -30,20 +38,20 @@ const UNIFORM_TYPES: Record<number, [number, Upload]> = {
   0x8b51: [3, (gl, l, v, n) => gl.uniform3fv(l, v, 0, n)], // FLOAT_VEC3
   0x8b52: [4, (gl, l, v, n) => gl.uniform4fv(l, v, 0, n)], // FLOAT_VEC4
 
-  0x1404: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // INT
-  0x8b53: [2, (gl, l, v, n) => gl.uniform2iv(l, v, 0, n)], // INT_VEC2
-  0x8b54: [3, (gl, l, v, n) => gl.uniform3iv(l, v, 0, n)], // INT_VEC3
-  0x8b55: [4, (gl, l, v, n) => gl.uniform4iv(l, v, 0, n)], // INT_VEC4
+  0x1404: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // INT
+  0x8b53: [2, (gl, l, v, n) => gl.uniform2iv(l, ints(v), 0, n)], // INT_VEC2
+  0x8b54: [3, (gl, l, v, n) => gl.uniform3iv(l, ints(v), 0, n)], // INT_VEC3
+  0x8b55: [4, (gl, l, v, n) => gl.uniform4iv(l, ints(v), 0, n)], // INT_VEC4
 
-  0x8b56: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // BOOL
-  0x8b57: [2, (gl, l, v, n) => gl.uniform2iv(l, v, 0, n)], // BOOL_VEC2
-  0x8b58: [3, (gl, l, v, n) => gl.uniform3iv(l, v, 0, n)], // BOOL_VEC3
-  0x8b59: [4, (gl, l, v, n) => gl.uniform4iv(l, v, 0, n)], // BOOL_VEC4
+  0x8b56: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // BOOL
+  0x8b57: [2, (gl, l, v, n) => gl.uniform2iv(l, ints(v), 0, n)], // BOOL_VEC2
+  0x8b58: [3, (gl, l, v, n) => gl.uniform3iv(l, ints(v), 0, n)], // BOOL_VEC3
+  0x8b59: [4, (gl, l, v, n) => gl.uniform4iv(l, ints(v), 0, n)], // BOOL_VEC4
 
-  0x1405: [1, (gl, l, v, n) => gl.uniform1uiv(l, v, 0, n)], // UNSIGNED_INT
-  0x8dc6: [2, (gl, l, v, n) => gl.uniform2uiv(l, v, 0, n)], // UNSIGNED_INT_VEC2
-  0x8dc7: [3, (gl, l, v, n) => gl.uniform3uiv(l, v, 0, n)], // UNSIGNED_INT_VEC3
-  0x8dc8: [4, (gl, l, v, n) => gl.uniform4uiv(l, v, 0, n)], // UNSIGNED_INT_VEC4
+  0x1405: [1, (gl, l, v, n) => gl.uniform1uiv(l, ints(v), 0, n)], // UNSIGNED_INT
+  0x8dc6: [2, (gl, l, v, n) => gl.uniform2uiv(l, ints(v), 0, n)], // UNSIGNED_INT_VEC2
+  0x8dc7: [3, (gl, l, v, n) => gl.uniform3uiv(l, ints(v), 0, n)], // UNSIGNED_INT_VEC3
+  0x8dc8: [4, (gl, l, v, n) => gl.uniform4uiv(l, ints(v), 0, n)], // UNSIGNED_INT_VEC4
 
   0x8b5a: [4,  (gl, l, v, n) => gl.uniformMatrix2fv(l, false, v, 0, n)], // FLOAT_MAT2
   0x8b5b: [9,  (gl, l, v, n) => gl.uniformMatrix3fv(l, false, v, 0, n)], // FLOAT_MAT3
@@ -56,21 +64,21 @@ const UNIFORM_TYPES: Record<number, [number, Upload]> = {
   0x8b6a: [12, (gl, l, v, n) => gl.uniformMatrix4x3fv(l, false, v, 0, n)], // FLOAT_MAT4x3
 
   // samplers take a texture unit index
-  0x8b5e: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_2D
-  0x8b5f: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_3D
-  0x8b60: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_CUBE
-  0x8b62: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_2D_SHADOW
-  0x8dc1: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_2D_ARRAY
-  0x8dc4: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_2D_ARRAY_SHADOW
-  0x8dc5: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // SAMPLER_CUBE_SHADOW
-  0x8dca: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // INT_SAMPLER_2D
-  0x8dcb: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // INT_SAMPLER_3D
-  0x8dcc: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // INT_SAMPLER_CUBE
-  0x8dcf: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // INT_SAMPLER_2D_ARRAY
-  0x8dd2: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // UNSIGNED_INT_SAMPLER_2D
-  0x8dd3: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // UNSIGNED_INT_SAMPLER_3D
-  0x8dd4: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // UNSIGNED_INT_SAMPLER_CUBE
-  0x8dd7: [1, (gl, l, v, n) => gl.uniform1iv(l, v, 0, n)], // UNSIGNED_INT_SAMPLER_2D_ARRAY
+  0x8b5e: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_2D
+  0x8b5f: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_3D
+  0x8b60: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_CUBE
+  0x8b62: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_2D_SHADOW
+  0x8dc1: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_2D_ARRAY
+  0x8dc4: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_2D_ARRAY_SHADOW
+  0x8dc5: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // SAMPLER_CUBE_SHADOW
+  0x8dca: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // INT_SAMPLER_2D
+  0x8dcb: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // INT_SAMPLER_3D
+  0x8dcc: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // INT_SAMPLER_CUBE
+  0x8dcf: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // INT_SAMPLER_2D_ARRAY
+  0x8dd2: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // UNSIGNED_INT_SAMPLER_2D
+  0x8dd3: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // UNSIGNED_INT_SAMPLER_3D
+  0x8dd4: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // UNSIGNED_INT_SAMPLER_CUBE
+  0x8dd7: [1, (gl, l, v, n) => gl.uniform1iv(l, ints(v), 0, n)], // UNSIGNED_INT_SAMPLER_2D_ARRAY
 };
 
 /**
@@ -102,14 +110,18 @@ export function getActiveUniforms(
  * Flatten a uniform value into a plain array of numbers.
  * Textures are not values; the renderer maps them to a texture unit first.
  */
-export function uniformToArray(value: Uniform): number[] {
+export function uniformToArray(value: Uniform): UniformValues {
   if (typeof value === 'number') {
     return [value];
   }
   if (typeof value === 'bigint') {
     return [Number(value)];
   }
-  if (value instanceof Vector || value instanceof Matrix) {
+  if (
+    value instanceof Vector ||
+    value instanceof Matrix ||
+    value instanceof Float32Matrix
+  ) {
     return value.values;
   }
   if (value instanceof Color) {
@@ -135,7 +147,7 @@ export function uniformToArray(value: Uniform): number[] {
 export function uploadUniform(
   gl: WebGL2RenderingContext,
   info: UniformInfo,
-  values: number[]
+  values: UniformValues
 ): void {
   const spec = UNIFORM_TYPES[info.type];
   if (!spec) {
@@ -155,7 +167,7 @@ export function uploadUniform(
  * @param gl the rendering context
  * @param program a linked program
  * @param name uniform name
- * @param value the value (numbers, arrays, Vector, Matrix, Color; a Texture is
+ * @param value the value (numbers, arrays, Vector, Matrix, Mat2/3/4, Color; a Texture is
  *   not supported here since it needs a texture unit assigned by the renderer)
  * @returns true if the uniform exists in the program and was set
  */

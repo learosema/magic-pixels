@@ -1,7 +1,10 @@
 import type { BufferGeometry } from '../geometries';
+import { Color } from '../utils';
+import type { Camera } from '../scene/camera';
 import type { Material } from '../scene/material';
 import type { Mesh } from '../scene/mesh';
-import type { Renderer } from '../scene/renderer';
+import type { Scene } from '../scene/scene';
+import { prepareScene, type Renderer } from '../scene/renderer';
 import { Texture } from '../scene/texture';
 import { usesMipmaps } from '../scene/constants';
 import { ERRORS } from './webgl-errors';
@@ -11,6 +14,7 @@ import {
   uniformToArray,
   uploadUniform,
   type UniformInfo,
+  type UniformValues,
 } from './uniforms';
 
 type GeometryResources = {
@@ -48,7 +52,7 @@ const RESERVED_ATTRIBUTE_LOCATIONS: [string, number][] = [
   ['uv', 2],
 ];
 
-function arraysEqual(a: number[], b: number[]): boolean {
+function arraysEqual(a: UniformValues, b: UniformValues): boolean {
   if (a.length !== b.length) {
     return false;
   }
@@ -65,10 +69,17 @@ function arraysEqual(a: number[], b: number[]): boolean {
  * vertex array objects and buffers (one set per geometry) and textures.
  * Scene objects stay plain data and can be shared between meshes freely.
  * Materials need a `glsl` shader source pair.
+ *
+ * Shaders can declare the built-in uniforms `modelMatrix`, `viewMatrix`,
+ * `projectionMatrix`, `modelViewMatrix` (mat4) and `normalMatrix` (mat3);
+ * they are set per mesh from the scene graph and the camera, unless the
+ * material defines a uniform of the same name.
  */
 export class WebGL2Renderer implements Renderer {
   gl: WebGL2RenderingContext;
   pixelRatio = 1;
+  /** clear color and depth at the start of every `render` (default true) */
+  autoClear = true;
 
   private geometries = new Map<BufferGeometry, GeometryResources>();
   private materials = new Map<Material, MaterialResources>();
@@ -84,23 +95,32 @@ export class WebGL2Renderer implements Renderer {
       throw Error(ERRORS.WEBGL_INIT);
     }
     this.gl = gl;
+    gl.enable(gl.DEPTH_TEST);
   }
 
   /**
-   * Render a list of meshes. Resources for geometries, materials and textures
+   * Render a scene: update the world matrices, then draw every visible mesh
+   * in depth-first order. Resources for geometries, materials and textures
    * are created on first use and reused afterwards.
-   * @param scene the meshes to draw, in order
+   * @param scene the scene graph
+   * @param camera the camera providing view and projection matrices
    * @returns this instance
    */
-  render(scene: Mesh[]): WebGL2Renderer {
+  render(scene: Scene, camera: Camera): WebGL2Renderer {
     const { gl } = this;
-    for (const { geometry, material } of scene) {
+    const meshes = prepareScene(scene, camera);
+    if (this.autoClear) {
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
+    for (const mesh of meshes) {
+      const { geometry, material } = mesh;
       const materialResources = this.getMaterialResources(material);
       const geometryResources = this.getGeometryResources(geometry);
       if (this.currentProgram !== materialResources.program) {
         gl.useProgram(materialResources.program);
         this.currentProgram = materialResources.program;
       }
+      this.setBuiltinUniforms(materialResources, mesh, camera);
       this.setUniforms(materialResources, material);
       gl.bindVertexArray(geometryResources.vao);
       const mode = GL_DRAW_MODE[material.drawMode];
@@ -126,6 +146,19 @@ export class WebGL2Renderer implements Renderer {
     canvas.width = width * pixelRatio;
     canvas.height = height * pixelRatio;
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    return this;
+  }
+
+  /**
+   * Set the color the frame is cleared to (black by default).
+   * @param color a `Color` or a hex string like `'#202020'`
+   * @param alpha overrides the color's alpha if given
+   */
+  setClearColor(color: Color | string, alpha?: number): WebGL2Renderer {
+    const [r, g, b, a] = (
+      typeof color === 'string' ? Color.fromHex(color) : color
+    ).toVec4();
+    this.gl.clearColor(r, g, b, alpha ?? a);
     return this;
   }
 
@@ -288,16 +321,55 @@ export class WebGL2Renderer implements Renderer {
 
   // ---------------------------------------------------------------- uniforms
 
+  /**
+   * Set the matrix uniforms the shader declares, unless the material
+   * provides a uniform of the same name.
+   */
+  private setBuiltinUniforms(
+    resources: MaterialResources,
+    mesh: Mesh,
+    camera: Camera
+  ): void {
+    const { uniforms } = mesh.material;
+    const wants = (name: string) =>
+      resources.uniforms.has(name) && !(name in uniforms);
+
+    mesh.modelViewMatrix.multiplyMatrices(camera.viewMatrix, mesh.worldMatrix);
+    if (wants('normalMatrix')) {
+      mesh.normalMatrix.setNormalMatrix(mesh.modelViewMatrix);
+      this.uploadIfChanged(resources, 'normalMatrix', mesh.normalMatrix.values);
+    }
+    if (wants('modelMatrix')) {
+      this.uploadIfChanged(resources, 'modelMatrix', mesh.worldMatrix.values);
+    }
+    if (wants('viewMatrix')) {
+      this.uploadIfChanged(resources, 'viewMatrix', camera.viewMatrix.values);
+    }
+    if (wants('projectionMatrix')) {
+      this.uploadIfChanged(
+        resources,
+        'projectionMatrix',
+        camera.projectionMatrix.values
+      );
+    }
+    if (wants('modelViewMatrix')) {
+      this.uploadIfChanged(
+        resources,
+        'modelViewMatrix',
+        mesh.modelViewMatrix.values
+      );
+    }
+  }
+
   private setUniforms(resources: MaterialResources, material: Material): void {
     const { gl } = this;
     let unit = 0;
     for (const [name, value] of Object.entries(material.uniforms)) {
-      const info = resources.uniforms.get(name);
-      if (!info) {
+      if (!resources.uniforms.has(name)) {
         // not declared in the shader or optimized away
         continue;
       }
-      let values: number[];
+      let values: UniformValues;
       if (value instanceof Texture) {
         gl.activeTexture(gl.TEXTURE0 + unit);
         this.bindTexture(value);
@@ -305,13 +377,26 @@ export class WebGL2Renderer implements Renderer {
       } else {
         values = uniformToArray(value);
       }
-      const previous = resources.state.get(name);
-      if (previous && arraysEqual(previous, values)) {
-        continue;
-      }
-      uploadUniform(gl, info, values);
-      resources.state.set(name, values.slice());
+      this.uploadIfChanged(resources, name, values);
     }
+  }
+
+  /** Upload a uniform unless the same values were uploaded last time */
+  private uploadIfChanged(
+    resources: MaterialResources,
+    name: string,
+    values: UniformValues
+  ): void {
+    const info = resources.uniforms.get(name);
+    if (!info) {
+      return;
+    }
+    const previous = resources.state.get(name);
+    if (previous && arraysEqual(previous, values)) {
+      return;
+    }
+    uploadUniform(this.gl, info, values);
+    resources.state.set(name, Array.from(values));
   }
 
   // ---------------------------------------------------------------- textures

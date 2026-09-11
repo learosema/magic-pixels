@@ -1,15 +1,19 @@
 #version 300 es
 precision highp float;
-in vec4 position;
-in vec4 normal;
+in vec3 position;
+in vec3 normal;
 in vec2 uv;
-out vec4 vPosition;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
+out vec3 vPosition;
+out vec3 vNormal;
 out vec2 vUv;
-out vec4 vNormal;
 
 void main() {
   vUv = uv;
-  vPosition = position;
-  vNormal = normal;
-  gl_Position = position;
+  vNormal = normalize(normalMatrix * normal);
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  vPosition = mvPosition.xyz;
+  gl_Position = projectionMatrix * mvPosition;
 }

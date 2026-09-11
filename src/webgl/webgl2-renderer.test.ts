@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry } from '../geometries';
-import { Color, Matrix, Vector } from '../utils';
+import { Color, Mat4, Matrix, Vector } from '../utils';
 import {
   createFakeCanvas,
   createFakeWebGL2,
@@ -7,6 +7,9 @@ import {
 } from '../test-utils/fake-webgl2';
 import { createShaderMaterial } from '../scene/material';
 import { Mesh } from '../scene/mesh';
+import { Object3D } from '../scene/object3d';
+import { Scene } from '../scene/scene';
+import { PerspectiveCamera } from '../scene/camera';
 import { Texture } from '../scene/texture';
 import { DrawMode, Filter, Wrapping } from '../scene/constants';
 import { WebGL2Renderer } from './webgl2-renderer';
@@ -42,6 +45,13 @@ function createTriangle(): BufferGeometry {
   return geometry;
 }
 
+function expectClose(actual: ArrayLike<number>, expected: ArrayLike<number>) {
+  expect(actual.length).toBe(expected.length);
+  for (let i = 0; i < expected.length; i++) {
+    expect(actual[i]).toBeCloseTo(expected[i], 5);
+  }
+}
+
 function createImage(): ImageData {
   return { width: 1, height: 1, data: new Uint8ClampedArray(4) } as ImageData;
 }
@@ -49,6 +59,13 @@ function createImage(): ImageData {
 describe('WebGL2Renderer', () => {
   let gl: FakeWebGL2;
   let renderer: WebGL2Renderer;
+
+  /** render the meshes as children of a fresh scene with a default camera */
+  const draw = (...meshes: Mesh[]) => {
+    const scene = new Scene();
+    scene.add(...meshes);
+    renderer.render(scene, new PerspectiveCamera());
+  };
 
   beforeEach(() => {
     gl = createFakeWebGL2();
@@ -66,7 +83,7 @@ describe('WebGL2Renderer', () => {
       drawMode: DrawMode.TRIANGLES,
       uniforms: {},
     });
-    expect(() => renderer.render([mesh])).toThrow(/glsl/);
+    expect(() => draw(mesh)).toThrow(/glsl/);
   });
 
   test('maps the draw mode to the GL constant', () => {
@@ -76,22 +93,22 @@ describe('WebGL2Renderer', () => {
       {},
       DrawMode.LINES
     );
-    renderer.render([new Mesh(createTriangle(), material)]);
+    draw(new Mesh(createTriangle(), material));
     expect(gl.callsTo('drawArrays')[0].args).toEqual([gl.LINES, 0, 3]);
   });
 
   test('throws with the info log when a shader fails to compile', () => {
     const material = createShaderMaterial(VERTEX_SHADER, 'COMPILE_ERROR');
     const mesh = new Mesh(createTriangle(), material);
-    expect(() => renderer.render([mesh])).toThrow(/fake compile error/);
+    expect(() => draw(mesh)).toThrow(/fake compile error/);
   });
 
   test('compiles one program per material, shared by all meshes', () => {
     const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
     const a = new Mesh(createTriangle(), material);
     const b = new Mesh(createTriangle(), material);
-    renderer.render([a, b]);
-    renderer.render([a, b]);
+    draw(a, b);
+    draw(a, b);
     expect(gl.created.programs).toBe(1);
     expect(gl.callsTo('useProgram')).toHaveLength(1);
     expect(gl.callsTo('drawArrays')).toHaveLength(4);
@@ -107,8 +124,8 @@ describe('WebGL2Renderer', () => {
       geometry,
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
     );
-    renderer.render([a, b]);
-    renderer.render([a, b]);
+    draw(a, b);
+    draw(a, b);
     expect(gl.created.programs).toBe(2);
     expect(gl.created.vertexArrays).toBe(1);
     expect(gl.created.buffers).toBe(2);
@@ -117,9 +134,9 @@ describe('WebGL2Renderer', () => {
 
   test('uploads an index buffer for indexed geometries and draws with drawElements', () => {
     const geometry = createTriangle().setIndex([0, 1, 2]);
-    renderer.render([
-      new Mesh(geometry, createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)),
-    ]);
+    draw(
+      new Mesh(geometry, createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER))
+    );
     expect(gl.created.buffers).toBe(3);
     const [call] = gl.callsTo('drawElements');
     expect(call.args).toEqual([gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, 0]);
@@ -133,7 +150,7 @@ describe('WebGL2Renderer', () => {
       new BufferAttribute(new Float32Array([1, 2, 3]), 1)
     );
     const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
-    renderer.render([new Mesh(geometry, material)]);
+    draw(new Mesh(geometry, material));
 
     const program = gl.callsTo('createProgram').length;
     expect(program).toBe(1);
@@ -167,7 +184,7 @@ describe('WebGL2Renderer', () => {
       modelMatrix: Matrix.identity(4),
       unused: 42,
     });
-    renderer.render([new Mesh(createTriangle(), material)]);
+    draw(new Mesh(createTriangle(), material));
 
     const uploads = gl.calls
       .filter(({ name }) => name.startsWith('uniform'))
@@ -187,14 +204,14 @@ describe('WebGL2Renderer', () => {
       offset: new Vector(1, 2),
     });
     const mesh = new Mesh(createTriangle(), material);
-    renderer.render([mesh]);
-    renderer.render([mesh]);
+    draw(mesh);
+    draw(mesh);
     expect(gl.callsTo('uniform1fv')).toHaveLength(1);
     expect(gl.callsTo('uniform2fv')).toHaveLength(1);
 
     material.uniforms.time = 2;
     (material.uniforms.offset as Vector).x = 3;
-    renderer.render([mesh]);
+    draw(mesh);
     expect(gl.callsTo('uniform1fv')).toHaveLength(2);
     expect(gl.callsTo('uniform2fv')).toHaveLength(2);
     expect(gl.callsTo('uniform2fv')[1].args[1]).toEqual([3, 2]);
@@ -208,8 +225,8 @@ describe('WebGL2Renderer', () => {
       map2,
     });
     const mesh = new Mesh(createTriangle(), material);
-    renderer.render([mesh]);
-    renderer.render([mesh]);
+    draw(mesh);
+    draw(mesh);
 
     expect(gl.created.textures).toBe(2);
     expect(gl.callsTo('texImage2D')).toHaveLength(2);
@@ -238,7 +255,7 @@ describe('WebGL2Renderer', () => {
       createTriangle(),
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, { map })
     );
-    renderer.render([mesh]);
+    draw(mesh);
     const params = gl.callsTo('texParameteri').map(({ args }) => args[2]);
     expect(params).toEqual([0x2703, 0x2601, 0x2901, 0x8370]);
     expect(gl.callsTo('generateMipmap')).toHaveLength(1);
@@ -250,9 +267,9 @@ describe('WebGL2Renderer', () => {
       createTriangle(),
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, { map })
     );
-    renderer.render([mesh]);
+    draw(mesh);
     map.needsUpdate = true;
-    renderer.render([mesh]);
+    draw(mesh);
     expect(gl.created.textures).toBe(1);
     expect(gl.callsTo('texImage2D')).toHaveLength(2);
     expect(map.needsUpdate).toBe(false);
@@ -264,12 +281,12 @@ describe('WebGL2Renderer', () => {
       geometry,
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
     );
-    renderer.render([mesh]);
+    draw(mesh);
     const { position } = geometry.attributes;
     position.data[0] = 5;
     position.needsUpdate = true;
-    renderer.render([mesh]);
-    renderer.render([mesh]);
+    draw(mesh);
+    draw(mesh);
 
     expect(gl.callsTo('bufferSubData')).toHaveLength(1);
     expect(gl.callsTo('bufferSubData')[0].args[2]).toBe(position.data);
@@ -283,11 +300,11 @@ describe('WebGL2Renderer', () => {
       geometry,
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
     );
-    renderer.render([mesh]);
+    draw(mesh);
     const { position } = geometry.attributes;
     position.data = new Float32Array(18);
     position.needsUpdate = true;
-    renderer.render([mesh]);
+    draw(mesh);
 
     expect(gl.callsTo('bufferSubData')).toHaveLength(0);
     expect(gl.callsTo('bufferData')).toHaveLength(3);
@@ -300,12 +317,12 @@ describe('WebGL2Renderer', () => {
       geometry,
       createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
     );
-    renderer.render([mesh]);
+    draw(mesh);
     geometry.setAttribute(
       'custom',
       new BufferAttribute(new Float32Array([1, 2, 3]), 1)
     );
-    renderer.render([mesh]);
+    draw(mesh);
 
     expect(gl.deleted.vertexArrays).toBe(1);
     expect(gl.deleted.buffers).toBe(2);
@@ -316,9 +333,9 @@ describe('WebGL2Renderer', () => {
   test('recompiles the program when the shader source changes', () => {
     const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
     const mesh = new Mesh(createTriangle(), material);
-    renderer.render([mesh]);
+    draw(mesh);
     material.glsl!.fragment = FRAGMENT_SHADER + '\n// changed';
-    renderer.render([mesh]);
+    draw(mesh);
     expect(gl.created.programs).toBe(2);
     expect(gl.deleted.programs).toBe(1);
   });
@@ -330,7 +347,7 @@ describe('WebGL2Renderer', () => {
       map,
     });
     const mesh = new Mesh(geometry, material);
-    renderer.render([mesh]);
+    draw(mesh);
 
     renderer.dispose(geometry);
     expect(gl.deleted.vertexArrays).toBe(1);
@@ -344,7 +361,7 @@ describe('WebGL2Renderer', () => {
 
     // disposing again is a no-op, rendering recreates everything
     renderer.dispose(geometry);
-    renderer.render([mesh]);
+    draw(mesh);
     expect(gl.created.vertexArrays).toBe(2);
     expect(gl.created.programs).toBe(2);
     expect(gl.created.textures).toBe(2);
@@ -363,7 +380,7 @@ describe('WebGL2Renderer', () => {
         createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
       ),
     ];
-    renderer.render(meshes);
+    draw(...meshes);
     renderer.dispose();
 
     expect(gl.deleted).toEqual(gl.created);
@@ -375,5 +392,146 @@ describe('WebGL2Renderer', () => {
     expect(renderer.canvas.width).toBe(200);
     expect(renderer.canvas.height).toBe(100);
     expect(gl.callsTo('viewport')).toHaveLength(1);
+  });
+  test('enables depth testing and clears color and depth per frame', () => {
+    expect(gl.callsTo('enable').map(({ args }) => args[0])).toEqual([
+      gl.DEPTH_TEST,
+    ]);
+    const mesh = new Mesh(
+      createTriangle(),
+      createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
+    );
+    draw(mesh);
+    expect(gl.callsTo('clear')[0].args).toEqual([
+      gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT,
+    ]);
+    renderer.autoClear = false;
+    draw(mesh);
+    expect(gl.callsTo('clear')).toHaveLength(1);
+  });
+
+  test('setClearColor accepts hex strings and Colors', () => {
+    renderer.setClearColor('#ff0000');
+    renderer.setClearColor(new Color(0, 255, 0, 0), 0.5);
+    expect(gl.callsTo('clearColor').map(({ args }) => args)).toEqual([
+      [1, 0, 0, 1],
+      [0, 1, 0, 0.5],
+    ]);
+  });
+
+  test('draws visible meshes depth-first and skips invisible subtrees', () => {
+    const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+    const scene = new Scene();
+    const group = new Object3D();
+    const a = new Mesh(createTriangle(), material);
+    const b = new Mesh(createTriangle(), material);
+    const hidden = new Mesh(createTriangle(), material);
+    const childOfHidden = new Mesh(createTriangle(), material);
+    hidden.visible = false;
+    hidden.add(childOfHidden);
+    group.add(a, hidden);
+    scene.add(group, b);
+    b.visible = false;
+
+    renderer.render(scene, new PerspectiveCamera());
+    expect(gl.callsTo('drawArrays')).toHaveLength(1);
+    expect(gl.created.vertexArrays).toBe(1);
+  });
+
+  test('injects the built-in matrix uniforms from the scene graph and camera', () => {
+    const vertex = `#version 300 es
+in vec3 position;
+in vec3 normal;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat3 normalMatrix;
+void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    const material = createShaderMaterial(vertex, FRAGMENT_SHADER);
+    const scene = new Scene();
+    const parent = new Object3D();
+    const mesh = new Mesh(createTriangle(), material);
+    parent.position.set(1, 0, 0);
+    mesh.position.set(0, 2, 0);
+    mesh.scale.set(2, 2, 2);
+    parent.add(mesh);
+    scene.add(parent);
+    const camera = new PerspectiveCamera(90, 1, 1, 10);
+    camera.position.set(0, 0, 5);
+
+    renderer.render(scene, camera);
+
+    const mat4 = new Map(
+      gl.callsTo('uniformMatrix4fv').map(({ args }) => {
+        const location = args[0] as { name: string };
+        return [location.name, Array.from(args[2] as Float32Array)];
+      })
+    );
+    expect([...mat4.keys()].sort()).toEqual([
+      'modelMatrix',
+      'modelViewMatrix',
+      'projectionMatrix',
+      'viewMatrix',
+    ]);
+    expectClose(
+      mat4.get('modelMatrix')!,
+      Mat4.translation(1, 2, 0).multiply(Mat4.scaling(2, 2, 2)).values
+    );
+    expectClose(mat4.get('viewMatrix')!, Mat4.translation(0, 0, -5).values);
+    expectClose(
+      mat4.get('projectionMatrix')!,
+      Mat4.perspective(90, 1, 1, 10).values
+    );
+    expectClose(
+      mat4.get('modelViewMatrix')!,
+      Mat4.translation(1, 2, -5).multiply(Mat4.scaling(2, 2, 2)).values
+    );
+
+    const [normal] = gl.callsTo('uniformMatrix3fv');
+    expect((normal.args[0] as { name: string }).name).toBe('normalMatrix');
+    // inverse transpose of a uniform scale by 2 is a uniform scale by 0.5
+    expectClose(
+      normal.args[2] as Float32Array,
+      [0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5]
+    );
+
+    // nothing changed: nothing is re-uploaded
+    renderer.render(scene, camera);
+    expect(gl.callsTo('uniformMatrix4fv')).toHaveLength(4);
+    expect(gl.callsTo('uniformMatrix3fv')).toHaveLength(1);
+
+    // moving the mesh re-uploads the model matrices only
+    mesh.position.x = 5;
+    renderer.render(scene, camera);
+    const names = gl
+      .callsTo('uniformMatrix4fv')
+      .slice(4)
+      .map(({ args }) => (args[0] as { name: string }).name);
+    expect(names).toEqual(['modelMatrix', 'modelViewMatrix']);
+  });
+
+  test('material uniforms take precedence over built-in uniforms', () => {
+    const vertex = `#version 300 es
+in vec3 position;
+uniform mat4 projectionMatrix;
+void main() { gl_Position = projectionMatrix * vec4(position, 1.0); }`;
+    const projectionMatrix = Matrix.identity(4);
+    const material = createShaderMaterial(vertex, FRAGMENT_SHADER, {
+      projectionMatrix,
+    });
+    draw(new Mesh(createTriangle(), material));
+    const uploads = gl.callsTo('uniformMatrix4fv');
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0].args[2]).toBe(projectionMatrix.values);
+  });
+
+  test('uploads Mat4 uniforms without copying', () => {
+    const matrix = Mat4.rotX(1);
+    const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
+      modelMatrix: matrix,
+    });
+    draw(new Mesh(createTriangle(), material));
+    expect(gl.callsTo('uniformMatrix4fv')[0].args[2]).toBe(matrix.values);
   });
 });

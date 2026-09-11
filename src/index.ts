@@ -20,7 +20,6 @@ import {
   Mat2,
   Mat3,
   Mat4,
-  Camera,
   perspective,
   Color,
   mergeGeometries,
@@ -28,8 +27,14 @@ import {
 } from './utils';
 import {
   Texture,
+  Object3D,
+  Scene,
+  Camera,
+  PerspectiveCamera,
+  OrthographicCamera,
   Mesh,
   NullRenderer,
+  prepareScene,
   Filter,
   Wrapping,
   DrawMode,
@@ -40,6 +45,7 @@ import {
 } from './scene';
 import type {
   Renderer,
+  NullFrame,
   TextureData,
   TextureOptions,
   Material,
@@ -51,6 +57,7 @@ import { WebGL2Renderer, setUniform } from './webgl';
 
 export type {
   Renderer,
+  NullFrame,
   Uniform,
   Uniforms,
   TextureData,
@@ -69,9 +76,15 @@ export {
 };
 export {
   Texture,
+  Object3D,
+  Scene,
+  Camera,
+  PerspectiveCamera,
+  OrthographicCamera,
   Mesh,
   NullRenderer,
   WebGL2Renderer,
+  prepareScene,
   Filter,
   Wrapping,
   DrawMode,
@@ -88,7 +101,6 @@ export {
   Mat2,
   Mat3,
   Mat4,
-  Camera,
   calculateSurfaceNormal,
   facesToBuffer,
   mix,
