@@ -2,26 +2,25 @@ const ERRORS = {
   LOADING_ERROR: 'Error loading image',
 };
 
+// GL enum values are fixed by the spec; using the literals avoids touching the
+// WebGLRenderingContext global at import time (keeps the module loadable in Node).
 export const Wrapping: Record<string, number> = {
-  CLAMP_TO_EDGE: WebGLRenderingContext.CLAMP_TO_EDGE,
-  REPEAT: WebGLRenderingContext.REPEAT,
-  MIRRORED_REPEAT: WebGLRenderingContext.MIRRORED_REPEAT,
+  CLAMP_TO_EDGE: 0x812f,
+  REPEAT: 0x2901,
+  MIRRORED_REPEAT: 0x8370,
 };
 
 export const Filter: Record<string, number> = {
-  LINEAR: WebGLRenderingContext.LINEAR,
-  NEAREST: WebGLRenderingContext.NEAREST,
-  LINEAR_MIPMAP_LINEAR: WebGLRenderingContext.LINEAR_MIPMAP_LINEAR,
-  LINEAR_MIPMAP_NEAREST: WebGLRenderingContext.LINEAR_MIPMAP_NEAREST,
-  NEAREST_MIPMAP_LINEAR: WebGLRenderingContext.NEAREST_MIPMAP_LINEAR,
-  NEAREST_MIPMAP_NEAREST: WebGLRenderingContext.NEAREST_MIPMAP_NEAREST,
+  LINEAR: 0x2601,
+  NEAREST: 0x2600,
+  LINEAR_MIPMAP_LINEAR: 0x2703,
+  LINEAR_MIPMAP_NEAREST: 0x2701,
+  NEAREST_MIPMAP_LINEAR: 0x2702,
+  NEAREST_MIPMAP_NEAREST: 0x2700,
 };
 
 export type TextureData =
-  | HTMLImageElement
-  | HTMLVideoElement
-  | HTMLCanvasElement
-  | ImageData;
+  HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | ImageData;
 
 export type TextureOptions = {
   minFilter?: number;

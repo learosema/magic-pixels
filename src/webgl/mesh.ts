@@ -1,6 +1,6 @@
-import { BufferGeometry } from '../geometries';
+import type { BufferGeometry } from '../geometries';
 import { ERRORS } from './webgl-errors';
-import { Material } from './material';
+import type { Material } from './material';
 import { setUniform, wrapUniforms } from '../utils';
 
 export class Mesh {
@@ -281,7 +281,7 @@ export class Mesh {
       throw Error(ERRORS.WEBGL_INIT);
     }
     if (geometry.index !== null) {
-      let indexType = WebGLRenderingContext.NONE;
+      let indexType: GLenum = WebGLRenderingContext.NONE;
       if (geometry.indexType === 16) {
         indexType = WebGLRenderingContext.UNSIGNED_SHORT;
       }

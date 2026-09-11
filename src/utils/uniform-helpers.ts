@@ -1,4 +1,4 @@
-import { Uniform, Uniforms } from '../webgl/material';
+import type { Uniform, Uniforms } from '../webgl/material';
 import { Texture } from '../webgl/texture';
 import { Color } from './color';
 import { Matrix } from './matrix';

@@ -7,7 +7,7 @@ import { mix, clamp } from './one-liners';
 import { Stopwatch } from './stopwatch';
 import { ortho, frustum, perspective } from './perspective';
 import { Camera } from './camera';
-import { Material, Uniform, Uniforms } from '../webgl/material';
+import type { Material, Uniform, Uniforms } from '../webgl/material';
 import { setUniform, wrapUniforms } from './uniform-helpers';
 import { createIndexedGeometry } from './indexed-geometry';
 import { mergeGeometries } from './merge-geometries';
@@ -15,6 +15,8 @@ import { mergeGeometries } from './merge-geometries';
 import * as Mat2 from './mat2';
 import * as Mat3 from './mat3';
 import * as Mat4 from './mat4';
+
+export type { Material, Uniform, Uniforms };
 
 export {
   Vector,
@@ -32,9 +34,6 @@ export {
   Stopwatch,
   Color,
   Camera,
-  Material,
-  Uniform,
-  Uniforms,
   wrapUniforms,
   setUniform,
   mergeGeometries,

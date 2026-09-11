@@ -52,7 +52,7 @@ describe('generic matrix arithmetics', () => {
     // as this is compiled to JS and the library can be used in JS, the argument type checks may not be available
     // this is why there is a ts-ignore statement in our test to check what happens when the function is called
     // with arguments other than specified.
-    //@ts-ignore undefined check
+    // @ts-expect-error undefined check
     expect(() => Matrix.fromVectors(undefined)).toThrowError();
     expect(() => Matrix.fromVectors([])).toThrowError();
   });

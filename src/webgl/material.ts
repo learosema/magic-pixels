@@ -1,5 +1,6 @@
-import { Texture } from '.';
-import { Vector, Matrix, Color } from '../utils';
+import type { Texture } from './texture';
+import type { Vector, Matrix } from '../utils';
+import { Color } from '../utils';
 
 import defaultVertexShader from '../shaders/default.vert';
 import defaultFragmentShader from '../shaders/default.frag';

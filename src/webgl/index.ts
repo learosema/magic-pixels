@@ -1,4 +1,5 @@
-import { Filter, Texture, TextureData, Wrapping } from './texture';
+import { Filter, Texture, Wrapping } from './texture';
+import type { TextureData } from './texture';
 
 import { Mesh } from './mesh';
 import { Renderer } from './renderer';
@@ -7,8 +8,10 @@ import {
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
-  Material,
 } from './material';
+import type { Material } from './material';
+
+export type { TextureData, Material };
 
 export {
   Texture,
@@ -16,8 +19,6 @@ export {
   Renderer,
   Filter,
   Wrapping,
-  TextureData,
-  Material,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,

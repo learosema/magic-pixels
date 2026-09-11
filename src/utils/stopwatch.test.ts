@@ -2,15 +2,14 @@ import { Stopwatch } from './stopwatch';
 
 describe('Stopwatch tests', () => {
   let now = 0;
-  const originalPerfNow: () => number = global.performance.now;
 
   beforeEach(() => {
     now = 0;
-    global.performance.now = () => now;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
   });
 
   afterEach(() => {
-    global.performance.now = originalPerfNow;
+    vi.restoreAllMocks();
   });
 
   test('initial elapsed time value is zero', () => {

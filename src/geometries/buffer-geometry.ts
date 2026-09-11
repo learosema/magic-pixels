@@ -4,7 +4,10 @@ export type BufferGroup = {
 };
 
 export class BufferAttribute {
-  constructor(public data: Float32Array, public recordSize: number) {}
+  constructor(
+    public data: Float32Array,
+    public recordSize: number
+  ) {}
 
   get count(): number {
     return this.data.length / this.recordSize;
