@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "site",
+  "readme": "README.md",
+  "projectDocuments": ["docs/index.md"],
+  "navigation": {
+    "includeCategories": false,
+    "includeGroups": false
+  },
+  "sortEntryPoints": false,
+  "excludeInternal": true,
+  "treatWarningsAsErrors": false,
+  "highlightLanguages": [
+    "typescript",
+    "javascript",
+    "glsl",
+    "json",
+    "bash",
+    "html"
+  ]
+}

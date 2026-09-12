@@ -31,7 +31,7 @@
     "test:watch": "vitest",
     "build:types": "tsc -p tsconfig.build.json",
     "build:js": "node build",
-    "build:docs": "typedoc src/index.ts",
+    "build:docs": "typedoc",
     "build": "rm -rf dist && npm run build:types -s && npm run build:js -s",
     "prepublishOnly": "npm run lint -s && npm test -s && npm run build && npm run lint:pkg -s"
   },

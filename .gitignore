@@ -4,4 +4,4 @@ node_modules
 dist
 coverage
 *.log
-docs
+site
