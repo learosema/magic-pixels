@@ -6,6 +6,7 @@ import { Matrix } from './matrix';
 import { Mat2 } from './mat2';
 import { Mat3 } from './mat3';
 import { Mat4 } from './mat4';
+import { Quaternion } from './quaternion';
 import { mix, clamp } from './one-liners';
 import { Stopwatch } from './stopwatch';
 import { ortho, frustum, perspective } from './perspective';
@@ -18,6 +19,7 @@ export {
   Mat2,
   Mat3,
   Mat4,
+  Quaternion,
   calculateSurfaceNormal,
   facesToBuffer,
   mix,

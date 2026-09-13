@@ -1,6 +1,10 @@
 import { Float32Matrix } from './float32-matrix';
 import type { Matrix } from './matrix';
-import type { Vector } from './vector';
+import { Quaternion } from './quaternion';
+import { Vector } from './vector';
+
+const ZERO = new Vector(0, 0, 0);
+const ONE = new Vector(1, 1, 1);
 
 /**
  * A 4x4 matrix of 32-bit floats in column-major order, for transforms.
@@ -71,6 +75,11 @@ export class Mat4 extends Float32Matrix {
    */
   static rotZ(angle: number): Mat4 {
     return new Mat4().setRotationZ(angle);
+  }
+
+  /** create a rotation matrix from a unit quaternion */
+  static rotationFromQuaternion(quaternion: Quaternion): Mat4 {
+    return new Mat4().setRotationFromQuaternion(quaternion);
   }
 
   /**
@@ -181,6 +190,11 @@ export class Mat4 extends Float32Matrix {
        0, 0, 1, 0,
        0, 0, 0, 1
     ]);
+  }
+
+  /** @see Mat4.rotationFromQuaternion */
+  setRotationFromQuaternion(quaternion: Quaternion): this {
+    return this.compose(ZERO, quaternion, ONE);
   }
 
   /** @see Mat4.lookAt */
@@ -298,10 +312,26 @@ export class Mat4 extends Float32Matrix {
   /**
    * Set this to translation × rotation × scale.
    * @param position translation
-   * @param rotation Euler angles in radians, applied in XYZ order
+   * @param rotation the rotation as a unit {@link Quaternion}, or as Euler
+   * angles in radians applied in XYZ order
    * @param scale scale factors per axis
    */
-  compose(position: Vector, rotation: Vector, scale: Vector): this {
+  compose(
+    position: Vector,
+    rotation: Quaternion | Vector,
+    scale: Vector
+  ): this {
+    if (rotation instanceof Quaternion) {
+      return this.composeQuaternion(position, rotation, scale);
+    }
+    return this.composeEuler(position, rotation, scale);
+  }
+
+  private composeEuler(
+    position: Vector,
+    rotation: Vector,
+    scale: Vector
+  ): this {
     const te = this.values;
     const a = Math.cos(rotation.x);
     const b = Math.sin(rotation.x);
@@ -331,6 +361,52 @@ export class Mat4 extends Float32Matrix {
     te[8] = d * sz;
     te[9] = -b * c * sz;
     te[10] = a * c * sz;
+    te[11] = 0;
+
+    te[12] = position.x;
+    te[13] = position.y;
+    te[14] = position.z;
+    te[15] = 1;
+    return this;
+  }
+
+  private composeQuaternion(
+    position: Vector,
+    quaternion: Quaternion,
+    scale: Vector
+  ): this {
+    const te = this.values;
+    const { x, y, z, w } = quaternion;
+    const x2 = x + x;
+    const y2 = y + y;
+    const z2 = z + z;
+    const xx = x * x2;
+    const xy = x * y2;
+    const xz = x * z2;
+    const yy = y * y2;
+    const yz = y * z2;
+    const zz = z * z2;
+    const wx = w * x2;
+    const wy = w * y2;
+    const wz = w * z2;
+    const sx = scale.x;
+    const sy = scale.y;
+    const sz = scale.z;
+
+    // the rotation matrix of a unit quaternion, each column scaled
+    te[0] = (1 - (yy + zz)) * sx;
+    te[1] = (xy + wz) * sx;
+    te[2] = (xz - wy) * sx;
+    te[3] = 0;
+
+    te[4] = (xy - wz) * sy;
+    te[5] = (1 - (xx + zz)) * sy;
+    te[6] = (yz + wx) * sy;
+    te[7] = 0;
+
+    te[8] = (xz + wy) * sz;
+    te[9] = (yz - wx) * sz;
+    te[10] = (1 - (xx + yy)) * sz;
     te[11] = 0;
 
     te[12] = position.x;
