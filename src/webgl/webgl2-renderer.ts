@@ -11,6 +11,7 @@ import { ERRORS } from './webgl-errors';
 import {
   GL_DRAW_MODE,
   GL_FILTER,
+  GL_INTERNAL_FORMAT,
   GL_WRAPPING,
   glComponentType,
 } from './gl-constants';
@@ -425,10 +426,11 @@ export class WebGL2Renderer implements Renderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, texture.flipY);
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.RGBA,
+        GL_INTERNAL_FORMAT[texture.colorSpace],
         gl.RGBA,
         gl.UNSIGNED_BYTE,
         texture.image

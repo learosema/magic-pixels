@@ -39,3 +39,9 @@ export type Wrapping = (typeof Wrapping)[keyof typeof Wrapping];
 export function usesMipmaps(filter: Filter): boolean {
   return filter.includes('mipmap');
 }
+
+export const ColorSpace = {
+  LINEAR: 'linear',
+  SRGB: 'srgb',
+} as const;
+export type ColorSpace = (typeof ColorSpace)[keyof typeof ColorSpace];

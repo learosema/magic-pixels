@@ -11,7 +11,7 @@ import { Object3D } from '../scene/object3d';
 import { Scene } from '../scene/scene';
 import { PerspectiveCamera } from '../scene/camera';
 import { Texture } from '../scene/texture';
-import { DrawMode, Filter, Wrapping } from '../scene/constants';
+import { ColorSpace, DrawMode, Filter, Wrapping } from '../scene/constants';
 import { WebGL2Renderer } from './webgl2-renderer';
 
 const VERTEX_SHADER = `#version 300 es
@@ -290,6 +290,30 @@ describe('WebGL2Renderer', () => {
     const params = gl.callsTo('texParameteri').map(({ args }) => args[2]);
     expect(params).toEqual([0x2703, 0x2601, 0x2901, 0x8370]);
     expect(gl.callsTo('generateMipmap')).toHaveLength(1);
+  });
+
+  test('uploads sRGB textures with the sRGB internal format', () => {
+    const map = new Texture(createImage(), { colorSpace: ColorSpace.SRGB });
+    const mesh = new Mesh(
+      createTriangle(),
+      createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, { map })
+    );
+    draw(mesh);
+    const [, , internalFormat] = gl.callsTo('texImage2D')[0].args;
+    expect(internalFormat).toBe(0x8c43); // SRGB8_ALPHA8
+  });
+
+  test('flips the image vertically on upload when flipY is set', () => {
+    const map = new Texture(createImage(), { flipY: true });
+    const mesh = new Mesh(
+      createTriangle(),
+      createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, { map })
+    );
+    draw(mesh);
+    expect(gl.callsTo('pixelStorei')).toContainEqual({
+      name: 'pixelStorei',
+      args: [gl.UNPACK_FLIP_Y_WEBGL, true],
+    });
   });
 
   test('re-uploads a texture flagged with needsUpdate', () => {
