@@ -1,4 +1,4 @@
-import { Mat4, Vector } from '../utils';
+import { Mat4, Quaternion, Vector } from '../utils';
 import { Object3D } from './object3d';
 
 function expectClose(actual: ArrayLike<number>, expected: ArrayLike<number>) {
@@ -147,7 +147,7 @@ describe('Object3D', () => {
     expectClose(forward.xyz.values, [0, 0, -1]);
   });
 
-  test('setRotationFromMatrix recovers Euler XYZ angles', () => {
+  test('setRotationFromMatrix sets the quaternion and the Euler angles', () => {
     const angles = new Vector(0.3, -0.5, 1.2);
     const m = new Mat4().compose(
       new Vector(1, 2, 3),
@@ -157,5 +157,74 @@ describe('Object3D', () => {
     const object = new Object3D();
     object.setRotationFromMatrix(m);
     expectClose(object.rotation.values, angles.values);
+    expectClose(
+      object.quaternion.toArray(),
+      Quaternion.fromEuler(angles).toArray()
+    );
+    // the local matrix is the rotation part of m
+    object.updateLocalMatrix();
+    expectClose(
+      object.localMatrix.values,
+      Mat4.rotationFromQuaternion(object.quaternion).values
+    );
+  });
+
+  test('lookAt goes through the quaternion', () => {
+    const object = new Object3D();
+    object.lookAt(new Vector(5, 0, 0));
+    expectClose(
+      object.quaternion.toArray(),
+      Quaternion.fromAxisAngle(new Vector(0, 1, 0), Math.PI / 2).toArray()
+    );
+    expectClose(object.rotation.values, [0, Math.PI / 2, 0]);
+  });
+
+  test('writing rotation updates the quaternion on the next update', () => {
+    const object = new Object3D();
+    object.rotation.set(0.3, -0.5, 1.2);
+    object.updateLocalMatrix();
+    expectClose(
+      object.quaternion.toArray(),
+      Quaternion.fromEuler(object.rotation).toArray()
+    );
+    expectClose(
+      object.localMatrix.values,
+      new Mat4().compose(object.position, object.rotation, object.scale).values
+    );
+    // Euler angles outside -π..π are left alone while they are the source
+    object.rotation.z = 4;
+    object.updateLocalMatrix();
+    expect(object.rotation.z).toBe(4);
+    expectClose(
+      object.localMatrix.values,
+      new Mat4().compose(object.position, object.rotation, object.scale).values
+    );
+  });
+
+  test('writing the quaternion updates rotation on the next update', () => {
+    const object = new Object3D();
+    object.quaternion.setFromAxisAngle(new Vector(1, 0, 0), 0.7);
+    object.updateWorldMatrix();
+    expectClose(object.rotation.values, [0.7, 0, 0]);
+    expectClose(object.worldMatrix.values, Mat4.rotX(0.7).values);
+
+    // slerping the quaternion each frame keeps rotation in step
+    const target = Quaternion.fromAxisAngle(new Vector(1, 0, 0), 1.7);
+    object.quaternion.slerp(target, 0.5);
+    object.updateWorldMatrix();
+    expectClose(object.rotation.values, [1.2, 0, 0]);
+  });
+
+  test('the quaternion wins when both were changed', () => {
+    const object = new Object3D();
+    object.rotation.set(1, 1, 1);
+    object.quaternion.setFromAxisAngle(new Vector(0, 0, 1), 0.5);
+    object.updateLocalMatrix();
+    expectClose(object.rotation.values, [0, 0, 0.5]);
+    expectClose(object.localMatrix.values, Mat4.rotZ(0.5).values);
+
+    // and nothing changes when neither did
+    object.updateLocalMatrix();
+    expectClose(object.rotation.values, [0, 0, 0.5]);
   });
 });

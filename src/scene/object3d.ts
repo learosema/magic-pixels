@@ -1,13 +1,19 @@
-import { Mat4, Vector } from '../utils';
+import { Mat4, Quaternion, Vector } from '../utils';
 
 const DEFAULT_UP = new Vector(0, 1, 0);
 
 /**
  * Base class of everything in the scene graph. An object has a transform
- * relative to its parent (`position`, `rotation`, `scale`, composed into
- * `localMatrix`) and a list of `children`. `worldMatrix` is the transform
- * relative to the scene root, `parent.worldMatrix × localMatrix`, computed
- * by `updateWorldMatrix()` in a tree walk before each render.
+ * relative to its parent (`position`, `quaternion` or `rotation`, `scale`,
+ * composed into `localMatrix`) and a list of `children`. `worldMatrix` is
+ * the transform relative to the scene root,
+ * `parent.worldMatrix × localMatrix`, computed by `updateWorldMatrix()` in a
+ * tree walk before each render.
+ *
+ * The rotation is stored twice, as a {@link Quaternion} and as Euler angles,
+ * and either can be written to. `updateLocalMatrix()` compares both against
+ * their values at the last update and converts whichever changed into the
+ * other (the quaternion wins if both changed).
  *
  * A child inherits its parent's transform, so `planet.add(moon)` and
  * `moon.position.set(2, 0, 0)` make the moon orbit when `planet.rotation.y`
@@ -17,10 +23,19 @@ const DEFAULT_UP = new Vector(0, 1, 0);
 export class Object3D {
   /** translation relative to the parent */
   position = new Vector(0, 0, 0);
-  /** Euler angles in radians, applied in XYZ order */
+  /** rotation relative to the parent, as a unit quaternion */
+  quaternion = new Quaternion();
+  /**
+   * rotation relative to the parent, as Euler angles in radians applied in
+   * XYZ order; kept in sync with `quaternion`
+   */
   rotation = new Vector(0, 0, 0);
   /** scale factors per axis */
   scale = new Vector(1, 1, 1);
+
+  /** `quaternion` and `rotation` as of the last `updateLocalMatrix()` */
+  private readonly lastQuaternion = new Quaternion();
+  private readonly lastRotation = new Vector(0, 0, 0);
 
   parent: Object3D | null = null;
   readonly children: Object3D[] = [];
@@ -100,11 +115,36 @@ export class Object3D {
     }
   }
 
-  /** Recompose `localMatrix` from `position`, `rotation` and `scale` */
+  /**
+   * Recompose `localMatrix` from `position`, `quaternion` and `scale`, after
+   * bringing `quaternion` and `rotation` in sync (see the class description).
+   */
   updateLocalMatrix(): this {
-    this.localMatrix.compose(this.position, this.rotation, this.scale);
+    this.syncRotation();
+    this.localMatrix.compose(this.position, this.quaternion, this.scale);
     this.worldMatrixNeedsUpdate = true;
     return this;
+  }
+
+  /**
+   * Convert whichever of `quaternion` and `rotation` changed since the last
+   * call into the other one. The quaternion wins if both changed.
+   */
+  private syncRotation(): void {
+    const { quaternion, rotation, lastQuaternion, lastRotation } = this;
+    if (!quaternion.equals(lastQuaternion)) {
+      quaternion.toEuler(rotation);
+    } else if (
+      rotation.x !== lastRotation.x ||
+      rotation.y !== lastRotation.y ||
+      rotation.z !== lastRotation.z
+    ) {
+      quaternion.setFromEuler(rotation);
+    } else {
+      return;
+    }
+    lastQuaternion.copy(quaternion);
+    lastRotation.set(rotation.x, rotation.y, rotation.z);
   }
 
   /**
@@ -149,24 +189,14 @@ export class Object3D {
   }
 
   /**
-   * Set `rotation` from the rotation part of a matrix (Euler XYZ). The
-   * matrix must not contain scaling.
+   * Set `quaternion` (and with it `rotation`) from the rotation part of a
+   * matrix. The matrix must not contain scaling.
    */
   setRotationFromMatrix(matrix: Mat4): this {
-    const te = matrix.values;
-    const m11 = te[0],
-      m12 = te[4],
-      m13 = te[8];
-    const m22 = te[5],
-      m23 = te[9];
-    const m32 = te[6],
-      m33 = te[10];
-    const y = Math.asin(Math.min(1, Math.max(-1, m13)));
-    if (Math.abs(m13) < 0.9999999) {
-      this.rotation.set(Math.atan2(-m23, m33), y, Math.atan2(-m12, m11));
-    } else {
-      this.rotation.set(Math.atan2(m32, m22), y, 0);
-    }
+    this.quaternion.setFromRotationMatrix(matrix);
+    this.quaternion.toEuler(this.rotation);
+    this.lastQuaternion.copy(this.quaternion);
+    this.lastRotation.set(this.rotation.x, this.rotation.y, this.rotation.z);
     return this;
   }
 }

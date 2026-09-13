@@ -2,6 +2,7 @@ import { Mat2 } from './mat2';
 import { Mat3 } from './mat3';
 import { Mat4 } from './mat4';
 import { Matrix } from './matrix';
+import { Quaternion } from './quaternion';
 import { Vector } from './vector';
 import { frustum, ortho, perspective } from './perspective';
 
@@ -74,6 +75,29 @@ describe('Mat4', () => {
     const m = new Mat4().compose(position, rotation, scale);
     expectClose(m.values, expected.values);
     expect(m.getPosition(new Vector()).toArray()).toEqual([1, -2, 3]);
+  });
+
+  test('compose with a quaternion equals compose with the same Euler angles', () => {
+    const position = new Vector(1, -2, 3);
+    const rotation = new Vector(0.3, -0.8, 1.7);
+    const scale = new Vector(2, 3, 4);
+    const euler = new Mat4().compose(position, rotation, scale);
+    const quaternion = new Mat4().compose(
+      position,
+      Quaternion.fromEuler(rotation),
+      scale
+    );
+    expectClose(quaternion.values, euler.values);
+    expect(quaternion.getPosition(new Vector()).toArray()).toEqual([1, -2, 3]);
+  });
+
+  test('rotationFromQuaternion is a pure rotation', () => {
+    const q = Quaternion.fromAxisAngle(new Vector(0, 1, 0), Math.PI / 2);
+    const m = Mat4.rotationFromQuaternion(q);
+    expectClose(m.values, Mat4.rotY(Math.PI / 2).values);
+    expectClose(new Mat4().setRotationFromQuaternion(q).values, m.values);
+    expect(m.determinant()).toBeCloseTo(1, 5);
+    expectClose(project(m, 0, 0, 1), [1, 0, 0]);
   });
 
   test('lookAt builds a camera matrix looking down -Z', () => {
