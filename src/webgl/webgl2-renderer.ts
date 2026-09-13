@@ -8,7 +8,12 @@ import { prepareScene, type Renderer } from '../scene/renderer';
 import { Texture } from '../scene/texture';
 import { usesMipmaps } from '../scene/constants';
 import { ERRORS } from './webgl-errors';
-import { GL_DRAW_MODE, GL_FILTER, GL_WRAPPING } from './gl-constants';
+import {
+  GL_DRAW_MODE,
+  GL_FILTER,
+  GL_WRAPPING,
+  glComponentType,
+} from './gl-constants';
 import {
   getActiveUniforms,
   uniformToArray,
@@ -481,8 +486,8 @@ export class WebGL2Renderer implements Renderer {
       gl.vertexAttribPointer(
         location,
         attribute.recordSize,
-        gl.FLOAT,
-        false,
+        glComponentType(attribute.data),
+        attribute.normalized,
         0,
         0
       );
@@ -495,11 +500,7 @@ export class WebGL2Renderer implements Renderer {
       indexBuffer = gl.createBuffer();
       // the element array buffer binding is part of the VAO state
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      const data =
-        geometry.indexType === 32
-          ? new Uint32Array(geometry.index)
-          : new Uint16Array(geometry.index);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geometry.index, gl.STATIC_DRAW);
     }
 
     gl.bindVertexArray(null);

@@ -3,6 +3,16 @@ export type BufferGroup = {
   count: number;
 };
 
+/** Typed arrays a {@link BufferAttribute} can hold */
+export type TypedArray =
+  | Float32Array
+  | Int8Array
+  | Uint8Array
+  | Int16Array
+  | Uint16Array
+  | Int32Array
+  | Uint32Array;
+
 export class BufferAttribute {
   /**
    * Set to true after writing into `data` (or replacing it) so the renderer
@@ -13,10 +23,19 @@ export class BufferAttribute {
   /** Hint for the renderer that `data` is going to change frequently */
   dynamic = false;
 
+  /**
+   * For integer arrays, map the value range to 0..1 (unsigned) or -1..1
+   * (signed) instead of passing it through as-is. No effect on `Float32Array`.
+   */
+  normalized: boolean;
+
   constructor(
-    public data: Float32Array,
-    public recordSize: number
-  ) {}
+    public data: TypedArray,
+    public recordSize: number,
+    normalized = false
+  ) {
+    this.normalized = normalized;
+  }
 
   get count(): number {
     return this.data.length / this.recordSize;
@@ -35,7 +54,7 @@ export class BufferAttribute {
 export class BufferGeometry {
   attributes: Record<string, BufferAttribute> = {};
   count = 0;
-  index: number[] | null = null;
+  index: Uint16Array | Uint32Array | null = null;
   indexType: 0 | 16 | 32 = 0;
   groups: BufferGroup[] = [];
 
@@ -43,7 +62,8 @@ export class BufferGeometry {
   version = 0;
 
   setIndex(indices: ArrayLike<number>, bits: 16 | 32 = 16): BufferGeometry {
-    this.index = Array.from(indices);
+    this.index =
+      bits === 32 ? new Uint32Array(indices) : new Uint16Array(indices);
     this.indexType = bits;
     this.count = this.index.length;
     this.version++;

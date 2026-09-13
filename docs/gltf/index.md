@@ -3,6 +3,7 @@ title: Loading glTF models
 children:
   - ./concepts.md
   - ./quaternions.md
+  - ./typed-attributes.md
 ---
 
 # Loading glTF models
@@ -50,12 +51,12 @@ Euler in the loader, but animations (planned for later) interpolate between
 quaternions, so the quaternion became the real rotation of an
 {@link Object3D} and the Euler angles are derived from it.
 
-**2. Typed vertex attributes.** {@link BufferAttribute} only holds
-`Float32Array`s. glTF stores UVs, colors and joint indices as bytes and
-shorts, and a "quantized" file even stores positions as 16 bit integers to
-halve the file size. WebGL can read those directly; it just needs to be told
-the component type and whether to normalize integers to the 0..1 range. This
-step teaches the renderer that.
+**2. Typed vertex attributes** ([done](./typed-attributes.md)).
+{@link BufferAttribute} only held `Float32Array`s. glTF stores UVs, colors
+and joint indices as bytes and shorts, and a "quantized" file even stores
+positions as 16 bit integers to halve the file size. WebGL can read those
+directly; it just needs to be told the component type and whether to
+normalize integers to the 0..1 range. This step teaches the renderer that.
 
 **3. Texture extensions.** Two things. Images embedded in a `.glb` come out
 as an `ImageBitmap`, which the {@link Texture} type must accept. And color

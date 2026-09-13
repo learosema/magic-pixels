@@ -78,9 +78,12 @@ function mergeIndexedGeometries(
     throw Error();
   }
   const result = mergeNonIndexedGeometries(a, b);
-  const maxIndexA = Math.max.apply(null, a.index);
-  const maxIndexB = Math.max.apply(null, b.index);
-  const indices = a.index.concat(b.index.map((idx) => maxIndexA + 1 + idx));
+  const maxIndexA = Math.max(...a.index);
+  const maxIndexB = Math.max(...b.index);
+  const indices = [
+    ...a.index,
+    ...Array.from(b.index, (idx) => maxIndexA + 1 + idx),
+  ];
   result.setIndex(indices, maxIndexA + maxIndexB + 1 < 65534 ? 16 : 32);
   return result;
 }

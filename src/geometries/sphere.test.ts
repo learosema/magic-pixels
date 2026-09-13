@@ -19,7 +19,7 @@ describe('Geometry for a sphere', () => {
     expect(sphere.index).toHaveLength(faceCount * 3);
     expect(sphere.count).toBe(faceCount * 3);
     expect(sphere.indexType).toBe(16);
-    expect(Math.max(...(sphere.index as number[]))).toBeLessThan(vertexCount);
+    expect(Math.max(...sphere.index!)).toBeLessThan(vertexCount);
 
     // every vertex lies on the sphere
     for (let i = 0; i < vertexCount; i++) {

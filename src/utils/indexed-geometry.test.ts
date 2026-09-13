@@ -25,7 +25,7 @@ describe('createIndexedGeometry tests', () => {
     // triangle vertices are arranged in a counter-clockwise way
 
     //prettier-ignore
-    expect(indexedPlane.index).toEqual([
+    expect(Array.from(indexedPlane.index!)).toEqual([
       0, 1, 2, // triangle 1
       1, 3, 2, // triangle 2
     ]);
