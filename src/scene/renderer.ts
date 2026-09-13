@@ -1,5 +1,5 @@
 import type { BufferGeometry } from '../geometries';
-import type { Color } from '../utils';
+import { Mat4, type Color } from '../utils';
 import type { Camera } from './camera';
 import type { Material } from './material';
 import { Mesh } from './mesh';
@@ -36,29 +36,58 @@ export interface Renderer {
 }
 
 /**
- * Prepare a frame: update the world matrices of the scene (and of the
- * camera, if it is not part of the scene) and collect the meshes to draw,
- * in depth-first order, skipping invisible subtrees. Shared by all renderer
- * implementations.
+ * A prepared frame: opaque meshes in scene-tree order, transparent meshes
+ * (`material.transparent === true`) sorted back to front by view-space
+ * depth so blending composites correctly, and the visible lights. `lights`
+ * is always empty for now; step 5 (`Light`) starts populating it.
  */
-export function prepareScene(scene: Scene, camera: Camera): Mesh[] {
+export type Frame = {
+  meshes: Mesh[];
+  transparent: Mesh[];
+  lights: Object3D[];
+};
+
+const scratchMatrix = new Mat4();
+
+/**
+ * Prepare a frame: update the world matrices of the scene (and of the
+ * camera, if it is not part of the scene), collect the visible meshes in
+ * depth-first order, skipping invisible subtrees, and split them into
+ * opaque and transparent lists. Shared by all renderer implementations.
+ */
+export function prepareScene(scene: Scene, camera: Camera): Frame {
   scene.updateWorldMatrix();
   if (camera.parent === null) {
     camera.updateWorldMatrix();
   }
   const meshes: Mesh[] = [];
-  collectMeshes(scene, meshes);
-  return meshes;
+  const transparent: Mesh[] = [];
+  collectMeshes(scene, meshes, transparent);
+  const sorted = transparent
+    .map((mesh) => ({ mesh, depth: viewSpaceDepth(mesh, camera) }))
+    .sort((a, b) => a.depth - b.depth)
+    .map((entry) => entry.mesh);
+  return { meshes, transparent: sorted, lights: [] };
 }
 
-function collectMeshes(object: Object3D, meshes: Mesh[]): void {
+function collectMeshes(
+  object: Object3D,
+  meshes: Mesh[],
+  transparent: Mesh[]
+): void {
   if (!object.visible) {
     return;
   }
   if (object instanceof Mesh) {
-    meshes.push(object);
+    (object.material.transparent ? transparent : meshes).push(object);
   }
   for (const child of object.children) {
-    collectMeshes(child, meshes);
+    collectMeshes(child, meshes, transparent);
   }
+}
+
+/** A mesh's Z coordinate in view space; more negative is farther away. */
+function viewSpaceDepth(mesh: Mesh, camera: Camera): number {
+  scratchMatrix.multiplyMatrices(camera.viewMatrix, mesh.worldMatrix);
+  return scratchMatrix.values[14];
 }

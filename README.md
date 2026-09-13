@@ -57,7 +57,9 @@ there is a `NullRenderer`, which needs no canvas and records the frames it was a
 ```js
 const renderer = new NullRenderer();
 renderer.render(scene, camera);
-renderer.lastFrame.meshes; // the visible meshes, in draw order
+renderer.lastFrame.meshes; // opaque meshes, in tree order
+renderer.lastFrame.transparent; // transparent meshes, sorted back to front
+renderer.lastFrame.lights; // visible lights (always empty for now)
 ```
 
 ### Create a geometry
@@ -88,6 +90,16 @@ by the renderer.
 The default drawMode is `DrawMode.TRIANGLES`. Draw modes, texture filters and wrapping modes are
 plain strings (`'triangles'`, `'linear'`, `'repeat'`, ...) rather than GL constants; the `DrawMode`,
 `Filter` and `Wrapping` objects list them. See [MDN:drawArrays](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays) for what the modes mean.
+
+A material also carries render state, all optional:
+
+- `transparent` (default `false`) blends with `SRC_ALPHA, ONE_MINUS_SRC_ALPHA` instead of
+  overwriting the framebuffer, and turns depth writes off unless `depthWrite` is set explicitly.
+  Transparent meshes are drawn after opaque ones, sorted back to front.
+- `side` (default `Side.DOUBLE`, no culling) restricts drawing to `Side.FRONT` or `Side.BACK`
+  faces.
+- `depthTest` / `depthWrite` (default `true`) control whether a fragment is discarded by what is
+  already drawn, and whether it writes its own depth.
 
 ```js
 const material = createShaderMaterial(vertexShader, fragmentShader, {

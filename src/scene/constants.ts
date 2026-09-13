@@ -45,3 +45,11 @@ export const ColorSpace = {
   SRGB: 'srgb',
 } as const;
 export type ColorSpace = (typeof ColorSpace)[keyof typeof ColorSpace];
+
+/** Which faces of a triangle are drawn. `'double'` disables face culling. */
+export const Side = {
+  FRONT: 'front',
+  BACK: 'back',
+  DOUBLE: 'double',
+} as const;
+export type Side = (typeof Side)[keyof typeof Side];

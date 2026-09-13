@@ -40,6 +40,7 @@ import {
   Wrapping,
   DrawMode,
   ColorSpace,
+  Side,
   createBasicMaterial,
   createDefaultMaterial,
   createNormalMaterial,
@@ -47,6 +48,7 @@ import {
 } from './scene';
 import type {
   Renderer,
+  Frame,
   NullFrame,
   TextureData,
   TextureOptions,
@@ -59,6 +61,7 @@ import { WebGL2Renderer, setUniform } from './webgl';
 
 export type {
   Renderer,
+  Frame,
   NullFrame,
   Uniform,
   Uniforms,
@@ -92,6 +95,7 @@ export {
   Wrapping,
   DrawMode,
   ColorSpace,
+  Side,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,

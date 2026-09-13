@@ -2,6 +2,7 @@ import type {
   ColorSpace,
   DrawMode,
   Filter,
+  Side,
   Wrapping,
 } from '../scene/constants';
 import type { TypedArray } from '../geometries/buffer-geometry';
@@ -42,6 +43,16 @@ export const GL_WRAPPING: Record<Wrapping, number> = {
 export const GL_INTERNAL_FORMAT: Record<ColorSpace, number> = {
   linear: 0x1908, // RGBA
   srgb: 0x8c43, // SRGB8_ALPHA8
+};
+
+/**
+ * The face `cullFace` is told to discard for a given {@link Side}, i.e. the
+ * face opposite the one that stays visible. `'double'` has no entry: face
+ * culling is disabled instead of called with a face.
+ */
+export const GL_CULL_FACE: Partial<Record<Side, number>> = {
+  front: 0x0405, // BACK: keep front faces, cull back faces
+  back: 0x0404, // FRONT: keep back faces, cull front faces
 };
 
 type TypedArrayConstructor = new (...args: never[]) => TypedArray;

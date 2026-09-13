@@ -31,19 +31,24 @@ so scene code can be unit tested in Node.
 
 `prepareScene(scene, camera)` is shared by every implementation. It runs the
 tree walk (`scene.updateWorldMatrix()`, plus the camera's if the camera is
-not in the scene) and collects the visible {@link Mesh}es depth-first into
-an array, skipping invisible subtrees. That array is the draw list for the
-frame, drawn in tree order.
+not in the scene) and collects the visible {@link Mesh}es depth-first,
+skipping invisible subtrees, into a {@link Frame}: `meshes`, the opaque ones
+in tree order, `transparent` (`material.transparent === true`), sorted back
+to front by view-space depth, and `lights` (always empty for now; step 5
+starts collecting them). Opaque meshes can draw in any order because the
+depth test sorts them out per pixel; blended meshes cannot, so they draw
+last, farthest first, in the order that composites correctly.
 
 ## One frame in WebGL2Renderer
 
 ```
-meshes = prepareScene(scene, camera)
+frame = prepareScene(scene, camera)
 if autoClear: clear colour and depth
-for each mesh:
+for each mesh in frame.meshes, then frame.transparent:
   materialResources = program + uniform table for mesh.material   (cached)
   geometryResources = VAO + buffers for mesh.geometry               (cached)
   useProgram if it differs from the current one
+  apply the material's blend/cull/depth state, skipping calls that would be a no-op
   set built-in matrix uniforms the shader declares
   set material uniforms that changed, binding textures to units
   bindVertexArray
@@ -61,6 +66,16 @@ is automatic and the scene layer never learns what a program is.
 uniform uploads are skipped when values did not change, so a hundred meshes
 with one material cost a hundred draw calls but one program switch and one
 set of material uniforms.
+
+## Render state
+
+A {@link Material} can set `transparent`, `side`, `depthTest` and
+`depthWrite`; see [Materials and uniforms](./materials.md#render-state) for
+what each does. The renderer keeps its own record of what is currently
+enabled (blending, culling and which face, depth test, depth writes) and
+only issues `enable`/`disable`/`cullFace`/`depthMask` when a mesh's material
+actually asks for something different from the previous draw, the same
+skip-if-unchanged approach as the uniform cache.
 
 ## Depth and clearing
 
@@ -90,8 +105,9 @@ and loses the context; the renderer is finished afterwards.
 Two tools cover the two layers:
 
 - Scene code is tested through {@link NullRenderer}: render, then inspect
-  `renderer.lastFrame.meshes` for what would have been drawn and in which
-  order, or `renderer.disposed` for what was freed.
+  `renderer.lastFrame.meshes` and `.transparent` for what would have been
+  drawn and in which order, `.lights` for the visible lights, or
+  `renderer.disposed` for what was freed.
 - The WebGL2 renderer is tested against a fake `WebGL2RenderingContext`
   (`src/test-utils/fake-webgl2.ts`). It records every call with its
   arguments, counts objects created and deleted, and answers the queries

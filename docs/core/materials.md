@@ -90,6 +90,25 @@ built-in vertex shader uses `modelViewMatrix`, `projectionMatrix` and
 `normalMatrix` and passes `vPosition` (view space), `vNormal` (view space,
 normalised) and `vUv` to the fragment shader.
 
+## Render state
+
+Besides shaders and uniforms, a material carries the GPU state a shader
+cannot express itself, all optional:
+
+- `transparent` (default `false`): blend with what is already drawn
+  (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`) instead of overwriting it, and turn
+  depth writes off unless `depthWrite` says otherwise. It also decides draw
+  order - see [prepareScene](./renderer.md#preparescene).
+- `side` (default `Side.DOUBLE`, no culling): restrict drawing to
+  `Side.FRONT` or `Side.BACK` faces, for closed meshes where the unseen
+  side is a wasted fragment, or for a single-sided plane meant to be seen
+  from one direction only.
+- `depthTest` / `depthWrite` (default `true`): whether a fragment is
+  discarded by what is nearer, and whether it records its own depth.
+
+The theory behind blending and culling, and why glTF needs them, is in
+[Material render state](../gltf/material-render-state.md).
+
 ## Draw mode
 
 `drawMode` is one of the {@link DrawMode} strings and says how the GPU

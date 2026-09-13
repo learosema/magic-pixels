@@ -5,6 +5,7 @@ children:
   - ./quaternions.md
   - ./typed-attributes.md
   - ./texture-extensions.md
+  - ./material-render-state.md
 ---
 
 # Loading glTF models
@@ -66,12 +67,13 @@ the sRGB color space, so the GPU has to convert them to linear values before
 lighting math touches them (see
 [color spaces](./concepts.md#linear-and-srgb-color)).
 
-**4. Material render state.** A {@link Material} is shaders plus uniforms.
-A glTF material can also say "blend me with what is behind" (alpha mode
-`BLEND`) and "render both sides". That is GPU state, not a shader concern, so
-the material gets `transparent` and `side` fields and the renderer sets the
-blend and cull state per draw. Transparent meshes also have to be drawn last
-and back to front, which changes what `prepareScene()` returns.
+**4. Material render state** ([done](./material-render-state.md)). A
+{@link Material} is shaders plus uniforms. A glTF material can also say
+"blend me with what is behind" (alpha mode `BLEND`) and "render both sides".
+That is GPU state, not a shader concern, so the material gets `transparent`
+and `side` fields and the renderer sets the blend and cull state per draw.
+Transparent meshes also have to be drawn last and back to front, which
+changes what `prepareScene()` returns.
 
 **5. Lights.** A physically based material is meaningless without lights. A
 light becomes an {@link Object3D} subclass so it can be positioned and
