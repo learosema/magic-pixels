@@ -132,7 +132,8 @@ interpolate between two Euler rotations. A quaternion is four numbers
 `w = cos(angle / 2)`. Multiplying two unit quaternions composes the
 rotations, and _slerp_ (spherical linear interpolation) moves between two of
 them along the shortest arc at constant speed. glTF uses them for every node
-rotation and every rotation animation, which is why they come first.
+rotation and every rotation animation, which is why they come first. The
+[Quaternions](./quaternions.md) page has the math and the implementation.
 
 ## Further reading
 

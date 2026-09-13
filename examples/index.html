@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>magic-pixels examples</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #111318;
+        color: #e8e8ef;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      body {
+        max-width: 40rem;
+        padding: 2.5rem 1.5rem 4rem;
+        margin: 0 auto;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      p.intro {
+        opacity: 0.8;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 1rem;
+      }
+      li {
+        border: 1px solid #2a2d38;
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+      }
+      li a {
+        color: #9ecbff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      li a:hover {
+        text-decoration: underline;
+      }
+      li p {
+        margin: 0.4rem 0 0;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+      code {
+        background: #1c1f28;
+        padding: 0.1em 0.35em;
+        border-radius: 0.25em;
+      }
+      footer {
+        margin-top: 2.5rem;
+        font-size: 0.85rem;
+        opacity: 0.6;
+      }
+      footer a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>magic-pixels examples</h1>
+    <p class="intro">
+      Each example is a single HTML file that imports the library as an ES
+      module from <code>../magic-pixels.js</code>, a copy of the current build.
+      Run <code>npm run build:examples</code> once to create it, then serve this
+      folder with any static file server (a browser can't load an ES module over
+      <code>file://</code>) and open a demo, or read the source to see how it
+      uses the library.
+    </p>
+    <ul>
+      <li>
+        <a href="01-spinning-cube/">Spinning cube</a>
+        <p>
+          The smallest scene: a box, a normal material, a perspective camera, a
+          render loop.
+        </p>
+      </li>
+      <li>
+        <a href="02-scene-graph/">Scene graph orbit</a>
+        <p>
+          A sun, a planet and a moon, orbiting through parent/child transforms
+          and empty <code>Object3D</code> pivots.
+        </p>
+      </li>
+      <li>
+        <a href="03-shader-material/">Custom shader material</a>
+        <p>
+          A hand-written GLSL vertex/fragment pair displaces and colors a sphere
+          from a <code>time</code> uniform.
+        </p>
+      </li>
+      <li>
+        <a href="04-quaternion-slerp/">Quaternion slerp</a>
+        <p>
+          Two cubes swing between the same orientations: one slerps its
+          <code>quaternion</code>, the other lerps Euler angles and wobbles.
+        </p>
+      </li>
+    </ul>
+    <footer>
+      <a href="https://github.com/learosema/magic-pixels"
+        >magic-pixels on GitHub</a
+      >
+      &middot;
+      <a href="https://learosema.github.io/magic-pixels/">API docs</a>
+    </footer>
+  </body>
+</html>

@@ -11,10 +11,14 @@ composes: move the parent and every descendant moves with it.
 
 ## What an Object3D holds
 
-- `position`, `rotation`, `scale`: three {@link Vector}s, the object's
-  transform relative to its parent. `rotation` is Euler angles in radians,
-  XYZ order (see [Matrices](./matrices.md#composing-transforms)).
-- `localMatrix`: those three composed into one matrix, `T × R × S`.
+- `position`, `quaternion`, `rotation`, `scale`: the object's transform
+  relative to its parent. The rotation is stored twice: `quaternion` is a
+  {@link Quaternion}, the representation the local matrix is built from, and
+  `rotation` is the same rotation as Euler angles in radians, XYZ order (see
+  [Matrices](./matrices.md#composing-transforms)). Write to whichever is
+  convenient; the tree walk keeps them in sync (see below).
+- `localMatrix`: position, quaternion and scale composed into one matrix,
+  `T × R × S`.
 - `worldMatrix`: `parent.worldMatrix × localMatrix`, the transform relative
   to the scene root. This is what the renderer uploads as `modelMatrix`.
 - `parent` and `children`, maintained by `add()`, `remove()` and
@@ -29,9 +33,13 @@ composes: move the parent and every descendant moves with it.
 The renderer calls it on the scene at the start of every frame, and it
 recurses depth-first:
 
-1. If `matrixAutoUpdate` is true (the default), recompose `localMatrix` from
-   position, rotation and scale. There is no change detection on the three
-   vectors, so this always happens; composing is cheap.
+1. If `matrixAutoUpdate` is true (the default), bring `quaternion` and
+   `rotation` in sync and recompose `localMatrix` from position, quaternion
+   and scale. The sync compares both rotation fields against their values at
+   the last update: if the quaternion changed, `rotation` is derived from
+   it; if only the Euler angles changed, `quaternion` is derived from them;
+   if both changed, the quaternion wins. There is no change detection on
+   position and scale, so the recompose always happens; composing is cheap.
 2. If this object was flagged or an ancestor's world matrix changed,
    recompute `worldMatrix` from the parent's, clear the flag, call the
    `onWorldMatrixChanged()` hook (cameras use it to update their view
@@ -71,16 +79,17 @@ are the standard tool in any scene graph; a glTF file is full of them.
 
 ## lookAt
 
-`object.lookAt(target)` sets `rotation` so that the object's +Z axis points at
+`object.lookAt(target)` rotates the object so that its +Z axis points at
 `target`, a point in the _parent's_ coordinate system (the same system as
 `position`). A camera's viewing direction is -Z, so {@link Camera} overrides
 `lookAt` to point -Z at the target; both share `Mat4.lookAt`, which builds a
 rotation from a forward vector and an `up` hint by two cross products.
 
-The resulting matrix is converted back into Euler angles by
-`setRotationFromMatrix()`, which reads the angles off the matrix entries and
-handles the degenerate case where the Y rotation is ±90° and X and Z become
-indistinguishable. With quaternions this round trip disappears.
+The resulting matrix goes into `setRotationFromMatrix()`, which sets
+`quaternion` from the rotation part of the matrix and derives `rotation`
+from the quaternion, so both fields are current right after the call. The
+conversions are explained on the [Quaternions](../gltf/quaternions.md)
+page.
 
 ## traverse
 
@@ -96,6 +105,6 @@ like "hide every mesh with this material" or "count the triangles".
 - [three.js manual: Scene graph](https://threejs.org/manual/#en/scenegraph):
   the three.js version, with the same `add()` / parent / children API.
 - [3D Math Primer, chapter 8: Rotation in three dimensions](https://gamemath.com/book/orient.html):
-  Euler angles, what gimbal lock is, converting between Euler angles and
-  matrices (which is what `setRotationFromMatrix` does), and why quaternions
-  exist.
+  Euler angles, what gimbal lock is, converting between Euler angles,
+  matrices and quaternions (which is what `setRotationFromMatrix` and the
+  rotation sync do), and why quaternions exist.
