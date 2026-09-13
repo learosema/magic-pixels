@@ -1,4 +1,5 @@
 import type { DrawMode, Filter, Wrapping } from '../scene/constants';
+import type { TypedArray } from '../geometries/buffer-geometry';
 
 // GL enum values are fixed by the spec; using the literals keeps the module
 // loadable without a WebGL2RenderingContext global (e.g. in Node).
@@ -27,3 +28,27 @@ export const GL_WRAPPING: Record<Wrapping, number> = {
   repeat: 0x2901,
   'mirrored-repeat': 0x8370,
 };
+
+type TypedArrayConstructor = new (...args: never[]) => TypedArray;
+
+// keyed by the typed array constructor, since that is what a BufferAttribute
+// carries; there is no renderer-agnostic name for "an Int16Array" to key a
+// Record with.
+const GL_COMPONENT_TYPE = new Map<TypedArrayConstructor, number>([
+  [Int8Array, 0x1400], // BYTE
+  [Uint8Array, 0x1401], // UNSIGNED_BYTE
+  [Int16Array, 0x1402], // SHORT
+  [Uint16Array, 0x1403], // UNSIGNED_SHORT
+  [Int32Array, 0x1404], // INT
+  [Uint32Array, 0x1405], // UNSIGNED_INT
+  [Float32Array, 0x1406], // FLOAT
+]);
+
+/** The GL component type enum for a {@link BufferAttribute}'s `data` array */
+export function glComponentType(data: TypedArray): number {
+  const type = GL_COMPONENT_TYPE.get(data.constructor as TypedArrayConstructor);
+  if (type === undefined) {
+    throw new Error(`Unsupported typed array: ${data.constructor.name}`);
+  }
+  return type;
+}

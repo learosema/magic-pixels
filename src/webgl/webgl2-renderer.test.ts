@@ -175,6 +175,37 @@ describe('WebGL2Renderer', () => {
     ]);
   });
 
+  test('derives the GL component type and normalized flag per attribute', () => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new BufferAttribute(
+        new Int16Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]),
+        3,
+        true
+      )
+    );
+    geometry.setAttribute(
+      'uv',
+      new BufferAttribute(new Uint8Array([0, 0, 1, 0, 0, 1]), 2, true)
+    );
+    geometry.setAttribute(
+      'custom',
+      new BufferAttribute(new Float32Array([1, 2, 3]), 1)
+    );
+    const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+    draw(new Mesh(geometry, material));
+
+    const pointers = gl
+      .callsTo('vertexAttribPointer')
+      .map(({ args }) => [args[0], args[2], args[3]]);
+    expect(pointers).toEqual([
+      [0, gl.SHORT, true], // position
+      [2, gl.UNSIGNED_BYTE, true], // uv
+      [3, gl.FLOAT, false], // custom
+    ]);
+  });
+
   test('chooses the uniform setter from the declared GLSL type', () => {
     const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
       time: 1.5,

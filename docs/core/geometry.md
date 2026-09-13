@@ -13,8 +13,8 @@ drawn.
 
 An attribute is one per-vertex value: position, normal, texture coordinate,
 colour, anything the vertex shader declares with `in`. A
-{@link BufferAttribute} is a `Float32Array` plus a `recordSize`, the number
-of floats per vertex. Positions are `recordSize` 3, UVs 2. The attribute's
+{@link BufferAttribute} is a typed array plus a `recordSize`, the number of
+components per vertex. Positions are `recordSize` 3, UVs 2. The attribute's
 `count` is `data.length / recordSize`.
 
 ```js
@@ -29,6 +29,26 @@ The attribute _name_ is the link to the shader: the renderer looks up
 `position` in the program's inputs. Names are also how vertex attribute
 _locations_ are assigned, see below.
 
+`data` does not have to be a `Float32Array`. Any of the eight WebGL2 vertex
+component types works: `Int8Array`, `Uint8Array`, `Int16Array`,
+`Uint16Array`, `Int32Array`, `Uint32Array` and `Float32Array`. The renderer
+reads the GL type off the array's constructor, so passing an `Int16Array`
+for `position` needs nothing else. A third constructor argument,
+`normalized`, tells the GPU to map an integer's range onto `-1..1` (signed)
+or `0..1` (unsigned) instead of passing it straight through - the way glTF
+stores UVs as normalized `Uint8Array`s or `Uint16Array`s, and quantized
+positions as normalized `Int16Array`s, to shrink a file with no visible loss
+of precision:
+
+```js
+// UVs quantized to 8 bit: a quarter of the Float32Array size, unnoticeable
+// for texture lookups
+geometry.setAttribute(
+  'uv',
+  new BufferAttribute(new Uint8Array([0, 0, 255, 0, 128, 255]), 2, true)
+);
+```
+
 ## Indexed and non-indexed geometry
 
 Without an index, the GPU reads vertices in order and forms one primitive
@@ -40,9 +60,10 @@ the faces that meet there.
 With an index (`setIndex([...])`), the GPU reads the index array instead and
 looks each vertex up. Shared vertices are stored once. `count` then means the
 number of indices, and the draw call is `drawElements` instead of
-`drawArrays`. Indices are 16 bit by default, which covers 65 535 vertices;
-pass `32` as the second argument for larger meshes. `createIndexedGeometry()`
-converts a non-indexed geometry by merging identical vertices.
+`drawArrays`. `setIndex` stores the indices as a `Uint16Array` by default,
+which covers 65 535 vertices; pass `32` as the second argument for a
+`Uint32Array` for larger meshes. `createIndexedGeometry()` converts a
+non-indexed geometry by merging identical vertices.
 
 Sharing only works when everything at a vertex is shared. A cube's corner
 has three normals, so an indexed cube still stores each corner three times,

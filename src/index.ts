@@ -1,4 +1,4 @@
-import type { BufferGroup } from './geometries/buffer-geometry';
+import type { BufferGroup, TypedArray } from './geometries/buffer-geometry';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -66,6 +66,7 @@ export type {
   Material,
   ShaderSource,
   BufferGroup,
+  TypedArray,
 };
 
 export {

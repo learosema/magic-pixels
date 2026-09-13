@@ -25,6 +25,7 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [Loading glTF models](./gltf/index.md)
 - [Rendering concepts](./gltf/concepts.md)
 - [Quaternions](./gltf/quaternions.md)
+- [Typed vertex attributes](./gltf/typed-attributes.md)
 
 ## Reading list
 

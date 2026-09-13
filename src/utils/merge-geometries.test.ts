@@ -69,7 +69,7 @@ describe('mergeGeometries tests', () => {
        1,  1, 0, // top right
       -1,  1, 0  // top left
     ]);
-    expect(merged.index).toEqual([0, 1, 2, 5, 4, 3]);
+    expect(Array.from(merged.index!)).toEqual([0, 1, 2, 5, 4, 3]);
     expect(merged.groups).toEqual([
       { startIndex: 0, count: 3 },
       { startIndex: 3, count: 3 },
