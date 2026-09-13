@@ -2,6 +2,7 @@
 title: Loading glTF models
 children:
   - ./concepts.md
+  - ./quaternions.md
 ---
 
 # Loading glTF models
@@ -42,12 +43,12 @@ the steps below.
 
 ## The steps, and why each exists
 
-**1. Quaternions.** glTF stores node rotations as quaternions, four numbers
-that describe a rotation axis and angle without the gimbal lock problems of
-Euler angles. {@link Object3D} only has an Euler `rotation` today. We could
-convert quaternion to Euler in the loader, but animations (planned for later)
-interpolate between quaternions, so it is better to make the quaternion the
-real rotation and derive the Euler angles from it.
+**1. Quaternions** ([done](./quaternions.md)). glTF stores node rotations
+as quaternions, four numbers that describe a rotation axis and angle without
+the gimbal lock problems of Euler angles. We could convert quaternion to
+Euler in the loader, but animations (planned for later) interpolate between
+quaternions, so the quaternion became the real rotation of an
+{@link Object3D} and the Euler angles are derived from it.
 
 **2. Typed vertex attributes.** {@link BufferAttribute} only holds
 `Float32Array`s. glTF stores UVs, colors and joint indices as bytes and

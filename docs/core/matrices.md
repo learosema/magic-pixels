@@ -57,7 +57,8 @@ stating the two orders used in the library:
   That is what you want: scaling an object around its own origin before
   moving it somewhere. `Mat4.compose(position, rotation, scale)` builds this
   directly, without three separate matrices, by scaling the columns of the
-  rotation matrix and writing the position into column 3.
+  rotation matrix and writing the position into column 3. The rotation can
+  be a {@link Quaternion} (what the scene graph passes) or Euler angles.
 - **Rotation** = `Rx × Ry × Rz` for Euler angles in "XYZ order". Applied to
   a vector, the Z rotation happens first in world terms. The more useful
   reading is _intrinsic_: rotate the object around its own X axis, then
@@ -66,7 +67,8 @@ stating the two orders used in the library:
   different orientation. Euler angles also have two well-known limits:
   three sequential rotations can lose a degree of freedom (gimbal lock),
   and two orientations cannot be interpolated cleanly. Quaternions solve
-  both; see [Rendering concepts](../gltf/concepts.md#quaternions-briefly).
+  both, and `Mat4.rotationFromQuaternion(q)` turns one into a rotation
+  matrix without any trigonometry; see [Quaternions](../gltf/quaternions.md).
 - **World matrix** = `parent.worldMatrix × localMatrix`: apply the local
   transform, then the parent's, then the grandparent's, and so on up the
   tree.

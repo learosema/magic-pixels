@@ -13,7 +13,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 
 - An API that is somewhat familiar to THREE
 - `Vector`, `Matrix` classes, plus `Float32Array`-backed `Mat2`, `Mat3`, `Mat4` for transforms
-- a scene graph: `Object3D` with `position`, `rotation`, `scale`, `children`; `Scene`, `Mesh` and the cameras (`PerspectiveCamera`, `OrthographicCamera`) are `Object3D`s
+- a scene graph: `Object3D` with `position`, `quaternion`/`rotation`, `scale`, `children`; `Scene`, `Mesh` and the cameras (`PerspectiveCamera`, `OrthographicCamera`) are `Object3D`s
 - a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders a `Scene` through a `Camera` and owns all GPU resources (programs, vertex array objects, buffers, textures)
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
@@ -127,10 +127,12 @@ testing enabled.
 
 ### Scene graph
 
-`Scene`, `Mesh` and the cameras extend `Object3D`. Every object has a `position`, a `rotation`
-(Euler angles in radians, applied in XYZ order) and a `scale` relative to its parent, and a list of
-`children`. Before each render, the renderer walks the tree and computes every object's
-`worldMatrix` as `parent.worldMatrix × localMatrix`.
+`Scene`, `Mesh` and the cameras extend `Object3D`. Every object has a `position`, a rotation and a
+`scale` relative to its parent, and a list of `children`. The rotation is available both as a
+`quaternion` and as Euler angles in `rotation` (radians, applied in XYZ order); write to either one
+and the other follows on the next update (the quaternion wins if both changed). Before each render,
+the renderer walks the tree and computes every object's `worldMatrix` as
+`parent.worldMatrix × localMatrix`.
 
 A child inherits its parent's transform, so it orbits when the parent rotates:
 
@@ -160,6 +162,15 @@ Other useful bits: `object.visible = false` hides an object and its children,
 (for cameras: the viewing direction, -Z) at a point given in the parent's coordinate system.
 To drive `localMatrix` yourself, set `matrixAutoUpdate = false` and flag changes with
 `worldMatrixNeedsUpdate = true`.
+
+Quaternions are what glTF stores and what animations interpolate. `slerp` moves between two
+rotations along the shortest arc at constant speed:
+
+```js
+const from = Quaternion.fromEuler(new Vector(0, 0, 0));
+const to = Quaternion.fromAxisAngle(new Vector(1, 1, 0).normalized, Math.PI);
+mesh.quaternion.slerpQuaternions(from, to, t); // t from 0 to 1
+```
 
 ### Writing shaders
 
@@ -284,8 +295,11 @@ const DEG = Math.PI / 180;
 const rotationMatrix = Mat4.rotX(30 * DEG)
   .multiply(Mat4.rotY(45 * DEG))
   .multiply(Mat4.rotZ(-5 * DEG));
-// translation × rotation (Euler XYZ) × scale, as used by Object3D
-const model = new Mat4().compose(position, rotation, scale);
+// translation × rotation × scale, as used by Object3D; the rotation is a
+// Quaternion or Euler XYZ angles
+const model = new Mat4().compose(position, quaternion, scale);
+const fromEuler = new Mat4().compose(position, rotation, scale);
+const rotationOnly = Mat4.rotationFromQuaternion(quaternion);
 const inverse = model.clone().invert();
 // normal matrix for a model(-view) matrix
 const normalMatrix = new Mat3().setNormalMatrix(model);
@@ -304,7 +318,14 @@ color.toVec4();
 // returns [1, 0, 1, 1]
 ```
 
-## Examples on Codepen
+## Examples
+
+The `examples/` folder holds small self-contained demos, one HTML file each; they are deployed
+with the docs at [learosema.github.io/magic-pixels/examples](https://learosema.github.io/magic-pixels/examples/).
+To run them locally, `npm run build:examples` copies the current bundle next to them, then serve the
+folder with any static file server.
+
+### On Codepen
 
 Trigger Warning: these examples can cause sickness to people with motion sensitivities.
 

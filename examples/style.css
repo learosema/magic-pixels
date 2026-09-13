@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #111318;
+  color: #e8e8ef;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0 0 auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.overlay h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 32rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.overlay code {
+  font-size: 0.85em;
+}
+
+.overlay a {
+  pointer-events: auto;
+  flex: none;
+  color: #9ecbff;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.overlay a:hover {
+  text-decoration: underline;
+}
