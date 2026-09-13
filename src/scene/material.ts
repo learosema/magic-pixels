@@ -1,7 +1,7 @@
 import type { Texture } from './texture';
 import type { Vector, Matrix, Mat2, Mat3, Mat4 } from '../utils';
 import { Color } from '../utils';
-import { DrawMode } from './constants';
+import { DrawMode, type Side } from './constants';
 
 import defaultVertexShader from '../shaders/default.vert';
 import defaultFragmentShader from '../shaders/default.frag';
@@ -41,6 +41,22 @@ export type Material = {
   glsl?: ShaderSource;
   drawMode: DrawMode;
   uniforms: Uniforms;
+  /**
+   * Alpha blending (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`) instead of overwriting
+   * the framebuffer, and depth writes off unless `depthWrite` says
+   * otherwise. Also determines draw order: transparent meshes are drawn
+   * after opaque ones, back to front. Default `false`.
+   */
+  transparent?: boolean;
+  /** Which faces are drawn. Default `'double'`: no culling, as today. */
+  side?: Side;
+  /** Discard fragments behind what is already drawn. Default `true`. */
+  depthTest?: boolean;
+  /**
+   * Write fragment depth into the depth buffer. Defaults to `true`, except
+   * when `transparent` is `true` and `depthWrite` is not set explicitly.
+   */
+  depthWrite?: boolean;
 };
 
 export function createDefaultMaterial(): Material {

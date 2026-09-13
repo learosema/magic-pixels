@@ -3,6 +3,7 @@ import { Color } from '../utils';
 import type { Camera } from './camera';
 import type { Material } from './material';
 import type { Mesh } from './mesh';
+import type { Object3D } from './object3d';
 import { prepareScene } from './renderer';
 import type { Renderer } from './renderer';
 import type { Scene } from './scene';
@@ -12,8 +13,12 @@ import type { Texture } from './texture';
 export type NullFrame = {
   scene: Scene;
   camera: Camera;
-  /** the visible meshes, in the order a renderer would draw them */
+  /** opaque meshes, in the order a renderer would draw them */
   meshes: Mesh[];
+  /** transparent meshes, sorted back to front */
+  transparent: Mesh[];
+  /** visible lights; always empty until step 5 (`Light`) populates it */
+  lights: Object3D[];
 };
 
 /**
@@ -41,7 +46,8 @@ export class NullRenderer implements Renderer {
   }
 
   render(scene: Scene, camera: Camera): void {
-    this.frames.push({ scene, camera, meshes: prepareScene(scene, camera) });
+    const { meshes, transparent, lights } = prepareScene(scene, camera);
+    this.frames.push({ scene, camera, meshes, transparent, lights });
   }
 
   setSize(width: number, height: number): void {

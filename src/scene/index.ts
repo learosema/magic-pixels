@@ -2,6 +2,7 @@ import {
   ColorSpace,
   DrawMode,
   Filter,
+  Side,
   Wrapping,
   usesMipmaps,
 } from './constants';
@@ -19,7 +20,7 @@ import {
 } from './material';
 import type { Material, ShaderSource, Uniform, Uniforms } from './material';
 import { prepareScene } from './renderer';
-import type { Renderer } from './renderer';
+import type { Frame, Renderer } from './renderer';
 import { NullRenderer } from './null-renderer';
 import type { NullFrame } from './null-renderer';
 
@@ -31,6 +32,7 @@ export type {
   Uniform,
   Uniforms,
   Renderer,
+  Frame,
   NullFrame,
 };
 
@@ -48,6 +50,7 @@ export {
   Wrapping,
   DrawMode,
   ColorSpace,
+  Side,
   usesMipmaps,
   createDefaultMaterial,
   createBasicMaterial,

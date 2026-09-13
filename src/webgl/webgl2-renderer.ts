@@ -9,6 +9,7 @@ import { Texture } from '../scene/texture';
 import { usesMipmaps } from '../scene/constants';
 import { ERRORS } from './webgl-errors';
 import {
+  GL_CULL_FACE,
   GL_DRAW_MODE,
   GL_FILTER,
   GL_INTERNAL_FORMAT,
@@ -95,6 +96,14 @@ export class WebGL2Renderer implements Renderer {
   );
   private currentProgram: WebGLProgram | null = null;
 
+  // render state, tracked to skip redundant GL calls between draws; the
+  // initial values match the GL defaults plus the constructor's DEPTH_TEST
+  private blendEnabled = false;
+  private cullEnabled = false;
+  private cullFace: number | undefined = undefined;
+  private depthTestEnabled = true;
+  private depthWriteEnabled = true;
+
   constructor(public canvas: HTMLCanvasElement) {
     const gl = this.canvas.getContext('webgl2');
     if (!gl) {
@@ -114,32 +123,90 @@ export class WebGL2Renderer implements Renderer {
    */
   render(scene: Scene, camera: Camera): WebGL2Renderer {
     const { gl } = this;
-    const meshes = prepareScene(scene, camera);
+    const frame = prepareScene(scene, camera);
     if (this.autoClear) {
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
-    for (const mesh of meshes) {
-      const { geometry, material } = mesh;
-      const materialResources = this.getMaterialResources(material);
-      const geometryResources = this.getGeometryResources(geometry);
-      if (this.currentProgram !== materialResources.program) {
-        gl.useProgram(materialResources.program);
-        this.currentProgram = materialResources.program;
-      }
-      this.setBuiltinUniforms(materialResources, mesh, camera);
-      this.setUniforms(materialResources, material);
-      gl.bindVertexArray(geometryResources.vao);
-      const mode = GL_DRAW_MODE[material.drawMode];
-      if (geometry.index !== null) {
-        const indexType =
-          geometry.indexType === 32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
-        gl.drawElements(mode, geometry.count, indexType, 0);
-      } else {
-        gl.drawArrays(mode, 0, geometry.count);
-      }
+    for (const mesh of frame.meshes) {
+      this.drawMesh(mesh, camera);
+    }
+    for (const mesh of frame.transparent) {
+      this.drawMesh(mesh, camera);
     }
     gl.bindVertexArray(null);
     return this;
+  }
+
+  private drawMesh(mesh: Mesh, camera: Camera): void {
+    const { gl } = this;
+    const { geometry, material } = mesh;
+    const materialResources = this.getMaterialResources(material);
+    const geometryResources = this.getGeometryResources(geometry);
+    if (this.currentProgram !== materialResources.program) {
+      gl.useProgram(materialResources.program);
+      this.currentProgram = materialResources.program;
+    }
+    this.applyRenderState(material);
+    this.setBuiltinUniforms(materialResources, mesh, camera);
+    this.setUniforms(materialResources, material);
+    gl.bindVertexArray(geometryResources.vao);
+    const mode = GL_DRAW_MODE[material.drawMode];
+    if (geometry.index !== null) {
+      const indexType =
+        geometry.indexType === 32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+      gl.drawElements(mode, geometry.count, indexType, 0);
+    } else {
+      gl.drawArrays(mode, 0, geometry.count);
+    }
+  }
+
+  /**
+   * Apply a material's blend, cull and depth state, skipping GL calls whose
+   * value did not change since the last draw.
+   */
+  private applyRenderState(material: Material): void {
+    const { gl } = this;
+    const transparent = material.transparent ?? false;
+    if (transparent !== this.blendEnabled) {
+      if (transparent) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      } else {
+        gl.disable(gl.BLEND);
+      }
+      this.blendEnabled = transparent;
+    }
+
+    const cullFace = GL_CULL_FACE[material.side ?? 'double'];
+    const shouldCull = cullFace !== undefined;
+    if (shouldCull !== this.cullEnabled) {
+      if (shouldCull) {
+        gl.enable(gl.CULL_FACE);
+      } else {
+        gl.disable(gl.CULL_FACE);
+      }
+      this.cullEnabled = shouldCull;
+    }
+    if (shouldCull && cullFace !== this.cullFace) {
+      gl.cullFace(cullFace);
+      this.cullFace = cullFace;
+    }
+
+    const depthTest = material.depthTest ?? true;
+    if (depthTest !== this.depthTestEnabled) {
+      if (depthTest) {
+        gl.enable(gl.DEPTH_TEST);
+      } else {
+        gl.disable(gl.DEPTH_TEST);
+      }
+      this.depthTestEnabled = depthTest;
+    }
+
+    const depthWrite = material.depthWrite ?? !transparent;
+    if (depthWrite !== this.depthWriteEnabled) {
+      gl.depthMask(depthWrite);
+      this.depthWriteEnabled = depthWrite;
+    }
   }
 
   setPixelRatio(pixelRatio: number): WebGL2Renderer {

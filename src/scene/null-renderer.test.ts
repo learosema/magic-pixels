@@ -8,6 +8,10 @@ import { Object3D } from './object3d';
 import type { Renderer } from './renderer';
 import { Scene } from './scene';
 
+function createTransparentMaterial() {
+  return { ...createDefaultMaterial(), transparent: true };
+}
+
 describe('NullRenderer', () => {
   test('records rendered frames with the visible meshes in draw order', () => {
     const renderer: Renderer = new NullRenderer();
@@ -27,7 +31,35 @@ describe('NullRenderer', () => {
 
     const { frames, lastFrame } = renderer as NullRenderer;
     expect(frames.map((frame) => frame.meshes)).toEqual([[a, b], [a]]);
-    expect(lastFrame).toEqual({ scene, camera, meshes: [a] });
+    expect(lastFrame).toEqual({
+      scene,
+      camera,
+      meshes: [a],
+      transparent: [],
+      lights: [],
+    });
+  });
+
+  test('sorts transparent meshes back to front by view-space depth, after the opaque ones', () => {
+    const renderer = new NullRenderer();
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+    camera.position.set(0, 0, 10);
+    const opaque = new Mesh(new BufferGeometry(), createDefaultMaterial());
+    const near = new Mesh(new BufferGeometry(), createTransparentMaterial());
+    const middle = new Mesh(new BufferGeometry(), createTransparentMaterial());
+    const far = new Mesh(new BufferGeometry(), createTransparentMaterial());
+    near.position.z = 4;
+    middle.position.z = 1;
+    far.position.z = -3;
+    // added out of depth order, on purpose
+    scene.add(opaque, near, far, middle);
+
+    renderer.render(scene, camera);
+
+    const { lastFrame } = renderer;
+    expect(lastFrame!.meshes).toEqual([opaque]);
+    expect(lastFrame!.transparent).toEqual([far, middle, near]);
   });
 
   test('updates the world matrices like a real renderer', () => {

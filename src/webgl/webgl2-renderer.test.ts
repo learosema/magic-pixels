@@ -11,7 +11,13 @@ import { Object3D } from '../scene/object3d';
 import { Scene } from '../scene/scene';
 import { PerspectiveCamera } from '../scene/camera';
 import { Texture } from '../scene/texture';
-import { ColorSpace, DrawMode, Filter, Wrapping } from '../scene/constants';
+import {
+  ColorSpace,
+  DrawMode,
+  Filter,
+  Side,
+  Wrapping,
+} from '../scene/constants';
 import { WebGL2Renderer } from './webgl2-renderer';
 
 const VERTEX_SHADER = `#version 300 es
@@ -588,5 +594,119 @@ void main() { gl_Position = projectionMatrix * vec4(position, 1.0); }`;
     });
     draw(new Mesh(createTriangle(), material));
     expect(gl.callsTo('uniformMatrix4fv')[0].args[2]).toBe(matrix.values);
+  });
+
+  describe('material render state', () => {
+    test('draws opaque meshes before transparent ones', () => {
+      const opaqueMaterial = createShaderMaterial(
+        VERTEX_SHADER,
+        FRAGMENT_SHADER
+      );
+      const transparentMaterial = createShaderMaterial(
+        VERTEX_SHADER,
+        FRAGMENT_SHADER
+      );
+      transparentMaterial.transparent = true;
+      const scene = new Scene();
+      // added in reverse draw order, on purpose
+      scene.add(
+        new Mesh(createTriangle(), transparentMaterial),
+        new Mesh(createTriangle(), opaqueMaterial)
+      );
+      renderer.render(scene, new PerspectiveCamera());
+
+      expect(gl.callsTo('drawArrays')).toHaveLength(2);
+      const [firstDraw, secondDraw] = gl.calls
+        .map((call, index) => ({ ...call, index }))
+        .filter((call) => call.name === 'drawArrays');
+      const blendEnabled = gl.calls.findIndex(
+        (call) => call.name === 'enable' && call.args[0] === gl.BLEND
+      );
+      // the opaque mesh draws without blending; blending turns on only
+      // before the transparent mesh's draw call
+      expect(blendEnabled).toBeGreaterThan(firstDraw.index);
+      expect(blendEnabled).toBeLessThan(secondDraw.index);
+    });
+
+    test('enables blending for a transparent material and turns depth writes off', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      material.transparent = true;
+      draw(new Mesh(createTriangle(), material));
+
+      expect(gl.callsTo('enable').map(({ args }) => args[0])).toContain(
+        gl.BLEND
+      );
+      expect(gl.callsTo('blendFunc')[0].args).toEqual([
+        gl.SRC_ALPHA,
+        gl.ONE_MINUS_SRC_ALPHA,
+      ]);
+      expect(gl.callsTo('depthMask')[0].args).toEqual([false]);
+    });
+
+    test('an explicit depthWrite overrides the transparent default', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      material.transparent = true;
+      material.depthWrite = true;
+      draw(new Mesh(createTriangle(), material));
+
+      expect(gl.callsTo('depthMask')).toHaveLength(0);
+    });
+
+    test('culls back faces for Side.FRONT and front faces for Side.BACK', () => {
+      const front = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      front.side = Side.FRONT;
+      draw(new Mesh(createTriangle(), front));
+      expect(gl.callsTo('enable').map(({ args }) => args[0])).toContain(
+        gl.CULL_FACE
+      );
+      expect(gl.callsTo('cullFace')[0].args).toEqual([gl.BACK]);
+
+      const back = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      back.side = Side.BACK;
+      draw(new Mesh(createTriangle(), back));
+      expect(gl.callsTo('cullFace')[1].args).toEqual([gl.FRONT]);
+    });
+
+    test('disables depth testing when depthTest is false', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      material.depthTest = false;
+      draw(new Mesh(createTriangle(), material));
+      expect(gl.callsTo('disable').map(({ args }) => args[0])).toContain(
+        gl.DEPTH_TEST
+      );
+    });
+
+    test('skips redundant state calls between meshes with the same render state', () => {
+      const materialA = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      materialA.side = Side.FRONT;
+      const materialB = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      materialB.side = Side.FRONT;
+      draw(
+        new Mesh(createTriangle(), materialA),
+        new Mesh(createTriangle(), materialB)
+      );
+
+      expect(gl.callsTo('enable').map(({ args }) => args[0])).toEqual([
+        gl.DEPTH_TEST,
+        gl.CULL_FACE,
+      ]);
+      expect(gl.callsTo('cullFace')).toHaveLength(1);
+    });
+
+    test('materials without render state fields behave exactly as before this step', () => {
+      draw(
+        new Mesh(
+          createTriangle(),
+          createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)
+        )
+      );
+      expect(gl.callsTo('enable').map(({ args }) => args[0])).toEqual([
+        gl.DEPTH_TEST,
+      ]);
+      expect(gl.callsTo('disable')).toHaveLength(0);
+      expect(gl.callsTo('blendFunc')).toHaveLength(0);
+      expect(gl.callsTo('cullFace')).toHaveLength(0);
+      expect(gl.callsTo('depthMask')).toHaveLength(0);
+    });
   });
 });
