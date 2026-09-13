@@ -15,6 +15,14 @@ by storing values on the inverse curve, called _sRGB_ encoding: a stored 0.5
 shows up as about 21% of full brightness, which our eyes, also non-linear,
 perceive as roughly half. Every PNG or JPEG you have ever seen is sRGB.
 
+This is a different kind of "color space" than HSV or OKLCH. Those use
+different axes entirely - hue/saturation/value, or perceptual
+lightness/chroma/hue - and converting between them and RGB is a real change
+of coordinates. Linear and sRGB use the exact same red/green/blue axes and
+the same gamut; only the number-to-light mapping within that gamut differs.
+Converting sRGB to linear does not change which colors exist, only what a
+given stored number means.
+
 Lighting math assumes linear light: two lights of intensity 1 make intensity 2. Feeding sRGB-encoded texels into that math gives colors that are too dark
 in the mid tones and highlights that wash out. So a renderer works in linear
 space and converts at the borders:

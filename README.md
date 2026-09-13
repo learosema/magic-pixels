@@ -210,11 +210,15 @@ const texture = await Texture.fromImageUrl('image.png', {
   magFilter: Filter.LINEAR,
   wrapS: Wrapping.REPEAT,
   wrapT: Wrapping.REPEAT,
+  colorSpace: ColorSpace.SRGB, // decode sRGB to linear on sample; default is 'linear'
 });
 material.uniforms.map = texture;
 
 // for video or canvas textures, flag the texture after the image changed:
 texture.needsUpdate = true;
+
+// decode raw bytes (e.g. an image embedded in a binary file) without an <img>:
+const fromBytes = await Texture.fromBlob(blob);
 ```
 
 ### Updating geometry

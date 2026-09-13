@@ -1,4 +1,10 @@
-import { DrawMode, Filter, Wrapping, usesMipmaps } from './constants';
+import {
+  ColorSpace,
+  DrawMode,
+  Filter,
+  Wrapping,
+  usesMipmaps,
+} from './constants';
 import { Texture } from './texture';
 import type { TextureData, TextureOptions } from './texture';
 import { Object3D } from './object3d';
@@ -41,6 +47,7 @@ export {
   Filter,
   Wrapping,
   DrawMode,
+  ColorSpace,
   usesMipmaps,
   createDefaultMaterial,
   createBasicMaterial,

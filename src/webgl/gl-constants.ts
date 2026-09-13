@@ -1,4 +1,9 @@
-import type { DrawMode, Filter, Wrapping } from '../scene/constants';
+import type {
+  ColorSpace,
+  DrawMode,
+  Filter,
+  Wrapping,
+} from '../scene/constants';
 import type { TypedArray } from '../geometries/buffer-geometry';
 
 // GL enum values are fixed by the spec; using the literals keeps the module
@@ -27,6 +32,16 @@ export const GL_WRAPPING: Record<Wrapping, number> = {
   'clamp-to-edge': 0x812f,
   repeat: 0x2901,
   'mirrored-repeat': 0x8370,
+};
+
+/**
+ * The sized internal format a texture is uploaded with. `'srgb'` uses
+ * `SRGB8_ALPHA8` so the GPU decodes sRGB-encoded texels to linear values
+ * on sample; `'linear'` uploads the bytes as they are.
+ */
+export const GL_INTERNAL_FORMAT: Record<ColorSpace, number> = {
+  linear: 0x1908, // RGBA
+  srgb: 0x8c43, // SRGB8_ALPHA8
 };
 
 type TypedArrayConstructor = new (...args: never[]) => TypedArray;

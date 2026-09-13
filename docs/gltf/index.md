@@ -4,6 +4,7 @@ children:
   - ./concepts.md
   - ./quaternions.md
   - ./typed-attributes.md
+  - ./texture-extensions.md
 ---
 
 # Loading glTF models
@@ -58,10 +59,11 @@ positions as 16 bit integers to halve the file size. WebGL can read those
 directly; it just needs to be told the component type and whether to
 normalize integers to the 0..1 range. This step teaches the renderer that.
 
-**3. Texture extensions.** Two things. Images embedded in a `.glb` come out
-as an `ImageBitmap`, which the {@link Texture} type must accept. And color
-textures in glTF are stored in the sRGB color space, so the GPU has to convert
-them to linear values before lighting math touches them (see
+**3. Texture extensions** ([done](./texture-extensions.md)). Two things.
+Images embedded in a `.glb` come out as an `ImageBitmap`, which the
+{@link Texture} type must accept. And color textures in glTF are stored in
+the sRGB color space, so the GPU has to convert them to linear values before
+lighting math touches them (see
 [color spaces](./concepts.md#linear-and-srgb-color)).
 
 **4. Material render state.** A {@link Material} is shaders plus uniforms.
