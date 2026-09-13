@@ -125,6 +125,12 @@ export class WebGL2Renderer implements Renderer {
     const { gl } = this;
     const frame = prepareScene(scene, camera);
     if (this.autoClear) {
+      // clear honours the depth mask, which a transparent material drawn
+      // last in the previous frame leaves switched off
+      if (!this.depthWriteEnabled) {
+        gl.depthMask(true);
+        this.depthWriteEnabled = true;
+      }
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
     for (const mesh of frame.meshes) {
