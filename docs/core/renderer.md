@@ -34,8 +34,8 @@ tree walk (`scene.updateWorldMatrix()`, plus the camera's if the camera is
 not in the scene) and collects the visible {@link Mesh}es depth-first,
 skipping invisible subtrees, into a {@link Frame}: `meshes`, the opaque ones
 in tree order, `transparent` (`material.transparent === true`), sorted back
-to front by view-space depth, and `lights` (always empty for now; step 5
-starts collecting them). Opaque meshes can draw in any order because the
+to front by view-space depth, and `lights`, reserved for the visible
+lights (nothing fills it yet). Opaque meshes can draw in any order because the
 depth test sorts them out per pixel; blended meshes cannot, so they draw
 last, farthest first, in the order that composites correctly.
 
@@ -82,6 +82,9 @@ skip-if-unchanged approach as the uniform cache.
 The constructor enables the depth test, and each frame starts by clearing
 colour and depth (`autoClear`). Without the depth test, meshes would be
 painted in draw order and a far object drawn later would cover a near one.
+Clearing honours the depth mask, so the renderer switches depth writes back
+on first if a transparent material left them off at the end of the previous
+frame.
 `setClearColor()` sets the background; `autoClear = false` keeps the
 previous frame, for feedback effects.
 

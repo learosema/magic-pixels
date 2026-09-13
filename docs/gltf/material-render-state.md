@@ -100,10 +100,10 @@ Where it lives:
 ## Try it
 
 [Material render state](https://learosema.github.io/magic-pixels/examples/07-material-state/)
-renders three overlapping, spinning translucent planes and one double-sided
-plane. Reorder the planes in the scene graph or change their positions - the
-draw order in the framebuffer stays back-to-front regardless, unlike the
-first frame of the demo before this step existed. Toggle a plane's `side`
+renders three overlapping translucent planes sliding through each other
+and one single-sided spinning plane. Reorder the translucent planes in the
+scene graph or change their positions - they still composite back to front,
+whichever one is nearest at the moment. Toggle a plane's `side`
 between `Side.FRONT` and `Side.DOUBLE` to see backface culling make it
 vanish from behind.
 

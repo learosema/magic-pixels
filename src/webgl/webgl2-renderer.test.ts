@@ -643,6 +643,31 @@ void main() { gl_Position = projectionMatrix * vec4(position, 1.0); }`;
       expect(gl.callsTo('depthMask')[0].args).toEqual([false]);
     });
 
+    test('turns depth writes back on before clearing the next frame', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      material.transparent = true;
+      const scene = new Scene();
+      scene.add(new Mesh(createTriangle(), material));
+      const camera = new PerspectiveCamera();
+      renderer.render(scene, camera);
+      renderer.render(scene, camera);
+
+      // clear respects the depth mask: the second frame must re-enable
+      // depth writes before it clears, or the depth buffer keeps the
+      // previous frame
+      const names = gl.calls.map((call) => call.name);
+      const secondClear = names.lastIndexOf('clear');
+      const depthMasks = gl.calls
+        .map((call, index) => ({ ...call, index }))
+        .filter((call) => call.name === 'depthMask');
+      expect(depthMasks.map(({ args }) => args)).toEqual([
+        [false],
+        [true],
+        [false],
+      ]);
+      expect(depthMasks[1].index).toBeLessThan(secondClear);
+    });
+
     test('an explicit depthWrite overrides the transparent default', () => {
       const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
       material.transparent = true;
