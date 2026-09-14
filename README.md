@@ -1,8 +1,6 @@
 # Magic pixels
 
-Magic pixels is a WebGL 3D library, which was originally developed under the name [colorful-pixels](https://github.com/sinnerschrader/colorful-pixels) at [SinnerSchrader](https://sinnerschrader.com).
-
-As I left the company, development work will be continued in this fork.
+Magic pixels is a WebGL 3D library. It was originally developed at SinnerSchrader under the name [colorful-pixels](https://www.npmjs.com/package/colorful-pixels); the original repository is no longer online, but the last published version is still on npm. Since I left the company, development continues here.
 
 ## Why yet another WebGL library?
 

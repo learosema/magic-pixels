@@ -96,7 +96,7 @@ from [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## [1.0.0](https://github.com/learosema/magic-pixels/releases/tag/v1.0.0) (2021-05-28)
 
-Initial release, continuing the [colorful-pixels](https://github.com/sinnerschrader/colorful-pixels) library under a new name.
+Initial release, continuing the [colorful-pixels](https://www.npmjs.com/package/colorful-pixels) library under a new name.
 
 ### Features
 
