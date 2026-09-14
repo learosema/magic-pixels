@@ -9,8 +9,8 @@ towards the camera, which is meaningless without knowing how much light
 arrives. This step adds the arriving part: three kinds of light source as
 nodes in the scene graph, and a fixed set of uniforms through which every
 shader can read them. The BRDF that turns arriving light into reflected
-light is the next step; here the shading is plain Lambert so the lights
-can be seen doing something.
+light is the [PBR material](./pbr-material.md); here the shading is plain
+Lambert so the lights can be seen doing something.
 
 ## Three kinds of light
 

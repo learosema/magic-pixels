@@ -53,3 +53,15 @@ export const Side = {
   DOUBLE: 'double',
 } as const;
 export type Side = (typeof Side)[keyof typeof Side];
+
+/**
+ * How a material treats the alpha of its base colour: ignore it, cut out
+ * fragments below a threshold, or blend with what is behind (see
+ * `createPbrMaterial`). The names are the glTF `alphaMode` values.
+ */
+export const AlphaMode = {
+  OPAQUE: 'opaque',
+  MASK: 'mask',
+  BLEND: 'blend',
+} as const;
+export type AlphaMode = (typeof AlphaMode)[keyof typeof AlphaMode];

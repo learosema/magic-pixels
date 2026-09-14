@@ -38,12 +38,25 @@ type GeometryResources = {
   version: number;
 };
 
-type MaterialResources = {
+/**
+ * A linked program with its uniform table, shared by every material whose
+ * shader sources are identical. The uniform state cache lives here because
+ * it mirrors what the program holds, whichever material set it last.
+ */
+type ProgramResources = {
   program: WebGLProgram;
   uniforms: Map<string, UniformInfo>;
   /** last uploaded values per uniform name; unchanged values are skipped */
   state: Map<string, number[]>;
-  /** the GLSL sources the program was compiled from */
+  /** cache key: the sources the program was compiled from */
+  key: string;
+  /** number of materials currently using the program */
+  users: number;
+};
+
+type MaterialResources = {
+  program: ProgramResources;
+  /** the GLSL sources at the time the program was looked up */
   vertex: string;
   fragment: string;
 };
@@ -117,8 +130,9 @@ function arraysEqual(a: UniformValues, b: UniformValues): boolean {
 }
 
 /**
- * WebGL2 renderer. Owns every GPU resource: programs (one per material),
- * vertex array objects and buffers (one set per geometry) and textures.
+ * WebGL2 renderer. Owns every GPU resource: programs (one per distinct
+ * pair of shader sources, shared by the materials using them), vertex
+ * array objects and buffers (one set per geometry) and textures.
  * Scene objects stay plain data and can be shared between meshes freely.
  * Materials need a `glsl` shader source pair.
  *
@@ -142,6 +156,8 @@ export class WebGL2Renderer implements Renderer {
 
   private geometries = new Map<BufferGeometry, GeometryResources>();
   private materials = new Map<Material, MaterialResources>();
+  /** programs by shader source, shared between materials */
+  private programs = new Map<string, ProgramResources>();
   private textures = new Map<Texture, TextureResources>();
   private attributeLocations = new Map<string, number>(
     RESERVED_ATTRIBUTE_LOCATIONS
@@ -201,15 +217,15 @@ export class WebGL2Renderer implements Renderer {
   private drawMesh(mesh: Mesh, camera: Camera): void {
     const { gl } = this;
     const { geometry, material } = mesh;
-    const materialResources = this.getMaterialResources(material);
+    const { program } = this.getMaterialResources(material);
     const geometryResources = this.getGeometryResources(geometry);
-    if (this.currentProgram !== materialResources.program) {
-      gl.useProgram(materialResources.program);
-      this.currentProgram = materialResources.program;
+    if (this.currentProgram !== program.program) {
+      gl.useProgram(program.program);
+      this.currentProgram = program.program;
     }
     this.applyRenderState(material);
-    this.setBuiltinUniforms(materialResources, mesh, camera);
-    this.setUniforms(materialResources, material);
+    this.setBuiltinUniforms(program, mesh, camera);
+    this.setUniforms(program, material);
     gl.bindVertexArray(geometryResources.vao);
     const mode = GL_DRAW_MODE[material.drawMode];
     if (geometry.index !== null) {
@@ -351,11 +367,8 @@ export class WebGL2Renderer implements Renderer {
     }
     if (!resources) {
       const { vertex, fragment } = glsl;
-      const program = this.createProgram(vertex, fragment);
       resources = {
-        program,
-        uniforms: getActiveUniforms(this.gl, program),
-        state: new Map(),
+        program: this.getProgramResources(vertex, fragment),
         vertex,
         fragment,
       };
@@ -364,17 +377,49 @@ export class WebGL2Renderer implements Renderer {
     return resources;
   }
 
+  /**
+   * Look up the program for a pair of sources, compiling it on first use.
+   * Materials with identical sources (two PBR materials with the same
+   * maps, say) share the program; it is deleted when the last one is
+   * disposed.
+   */
+  private getProgramResources(
+    vertex: string,
+    fragment: string
+  ): ProgramResources {
+    const key = `${vertex}\u0000${fragment}`;
+    let resources = this.programs.get(key);
+    if (!resources) {
+      const program = this.createProgram(vertex, fragment);
+      resources = {
+        program,
+        uniforms: getActiveUniforms(this.gl, program),
+        state: new Map(),
+        key,
+        users: 0,
+      };
+      this.programs.set(key, resources);
+    }
+    resources.users++;
+    return resources;
+  }
+
   private disposeMaterial(material: Material): void {
     const resources = this.materials.get(material);
     if (!resources) {
       return;
     }
-    if (this.currentProgram === resources.program) {
+    this.materials.delete(material);
+    const { program } = resources;
+    if (--program.users > 0) {
+      return;
+    }
+    if (this.currentProgram === program.program) {
       this.gl.useProgram(null);
       this.currentProgram = null;
     }
-    this.gl.deleteProgram(resources.program);
-    this.materials.delete(material);
+    this.gl.deleteProgram(program.program);
+    this.programs.delete(program.key);
   }
 
   private compileShader(type: number, source: string): WebGLShader {
@@ -460,7 +505,7 @@ export class WebGL2Renderer implements Renderer {
    * material provides a uniform of the same name.
    */
   private setBuiltinUniforms(
-    resources: MaterialResources,
+    resources: ProgramResources,
     mesh: Mesh,
     camera: Camera
   ): void {
@@ -472,7 +517,7 @@ export class WebGL2Renderer implements Renderer {
   }
 
   private setMatrixUniforms(
-    resources: MaterialResources,
+    resources: ProgramResources,
     mesh: Mesh,
     camera: Camera,
     wants: (name: string) => boolean
@@ -510,7 +555,7 @@ export class WebGL2Renderer implements Renderer {
    * loop over it never reads past the end.
    */
   private setLightUniforms(
-    resources: MaterialResources,
+    resources: ProgramResources,
     wants: (name: string) => boolean
   ): void {
     const lights = this.lightUniforms;
@@ -542,7 +587,7 @@ export class WebGL2Renderer implements Renderer {
     }
   }
 
-  private setUniforms(resources: MaterialResources, material: Material): void {
+  private setUniforms(resources: ProgramResources, material: Material): void {
     const { gl } = this;
     let unit = 0;
     for (const [name, value] of Object.entries(material.uniforms)) {
@@ -564,7 +609,7 @@ export class WebGL2Renderer implements Renderer {
 
   /** Upload a uniform unless the same values were uploaded last time */
   private uploadIfChanged(
-    resources: MaterialResources,
+    resources: ProgramResources,
     name: string,
     values: UniformValues
   ): void {

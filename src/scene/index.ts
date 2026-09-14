@@ -1,4 +1,5 @@
 import {
+  AlphaMode,
   ColorSpace,
   DrawMode,
   Filter,
@@ -18,8 +19,16 @@ import {
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  createPbrMaterial,
 } from './material';
-import type { Material, ShaderSource, Uniform, Uniforms } from './material';
+import type {
+  Material,
+  PbrMap,
+  PbrMaterialOptions,
+  ShaderSource,
+  Uniform,
+  Uniforms,
+} from './material';
 import { prepareScene } from './renderer';
 import type { Frame, Renderer } from './renderer';
 import { NullRenderer } from './null-renderer';
@@ -29,6 +38,8 @@ export type {
   TextureData,
   TextureOptions,
   Material,
+  PbrMap,
+  PbrMaterialOptions,
   ShaderSource,
   Uniform,
   Uniforms,
@@ -56,9 +67,11 @@ export {
   DrawMode,
   ColorSpace,
   Side,
+  AlphaMode,
   usesMipmaps,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  createPbrMaterial,
 };

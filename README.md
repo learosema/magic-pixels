@@ -15,6 +15,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders a `Scene` through a `Camera` and owns all GPU resources (programs, vertex array objects, buffers, textures)
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - lights as scene graph nodes (`AmbientLight`, `DirectionalLight`, `PointLight`), passed to shaders as built-in uniforms in view space
+- a physically based material (`createPbrMaterial`): the glTF metallic-roughness model with base colour, metallic-roughness, normal, occlusion and emissive maps, alpha modes and an unlit variant
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
@@ -78,8 +79,8 @@ const sphereGeometry = createSphereGeometry(1, 1, 16, 16);
 
 A material contains shader sources per shading language (`material.glsl = { vertex, fragment }`),
 a `drawMode` and a `uniforms` object. A material is plain data: the renderer compiles one program per
-material (shared by every mesh using it) and uploads the uniforms on each draw, skipping values that
-did not change. Just assign to `material.uniforms.time = ...` (or mutate a `Vector` in place) and
+distinct pair of shader sources (shared by every material and mesh using it) and uploads the uniforms
+on each draw, skipping values that did not change. Just assign to `material.uniforms.time = ...` (or mutate a `Vector` in place) and
 render. Replacing `material.glsl.fragment` recompiles the program on the next render.
 
 The setter for a uniform is chosen from the type declared in the shader, so a `Vector` works for
@@ -116,6 +117,34 @@ const basicMaterial = createBasicMaterial('#ff00ff');
 // the normals
 const normalMaterial = createNormalMaterial();
 ```
+
+### PBR material
+
+`createPbrMaterial(options)` is the lit material: the glTF 2.0 metallic-roughness model, shaded by
+the lights in the scene. Every option is a glTF material property of the same name and defaults to
+the glTF default. Colour factors are linear RGB in `0..1`; base colour and emissive maps should be
+created with `colorSpace: 'srgb'`, the other maps hold linear data.
+
+```js
+const material = createPbrMaterial({
+  baseColorFactor: [0.8, 0.2, 0.1, 1],
+  metallicFactor: 0,
+  roughnessFactor: 0.4,
+  baseColorMap: albedoTexture, // or { texture, uv: 1 } to sample the `uv1` attribute
+  normalMap: normalTexture,
+  emissiveFactor: [0, 0, 0],
+  alphaMode: AlphaMode.OPAQUE, // or MASK (with alphaCutoff) or BLEND (sets transparent)
+  doubleSided: false, // true draws both sides and flips the normal on back faces
+});
+// factors are ordinary uniforms
+material.uniforms.roughnessFactor = 0.9;
+```
+
+Which maps and attributes the material uses is baked into the shader when it is created, so adding
+a map means creating a new material. Set `vertexColors: true` to multiply in a `color` attribute,
+`tangents: true` when the geometry has a `tangent` attribute for the normal map (otherwise the
+tangent is reconstructed from screen-space derivatives), and `unlit: true` for base colour only
+(`KHR_materials_unlit`). Materials with the same options share one program.
 
 ### Create a mesh and render
 
@@ -202,8 +231,8 @@ bulb.position.set(0, 2, 0);
 scene.add(bulb);
 ```
 
-There is no built-in lit material yet: a shader reads the lights through the built-in uniforms
-described in the next section. The
+`createPbrMaterial()` reads them; so can any shader, through the built-in uniforms described in
+the next section. The
 [lights example](https://learosema.github.io/magic-pixels/examples/08-lights/) has a complete
 Lambert shader.
 

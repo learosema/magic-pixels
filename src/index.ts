@@ -45,10 +45,12 @@ import {
   DrawMode,
   ColorSpace,
   Side,
+  AlphaMode,
   createBasicMaterial,
   createDefaultMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  createPbrMaterial,
 } from './scene';
 import type {
   Renderer,
@@ -57,6 +59,8 @@ import type {
   TextureData,
   TextureOptions,
   Material,
+  PbrMap,
+  PbrMaterialOptions,
   ShaderSource,
   Uniform,
   Uniforms,
@@ -73,6 +77,8 @@ export type {
   TextureData,
   TextureOptions,
   Material,
+  PbrMap,
+  PbrMaterialOptions,
   ShaderSource,
   BufferGroup,
   TypedArray,
@@ -106,10 +112,12 @@ export {
   DrawMode,
   ColorSpace,
   Side,
+  AlphaMode,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,
   createShaderMaterial,
+  createPbrMaterial,
   setUniform,
 };
 export {

@@ -7,6 +7,7 @@ children:
   - ./texture-extensions.md
   - ./material-render-state.md
   - ./lights.md
+  - ./pbr-material.md
 ---
 
 # Loading glTF models
@@ -82,10 +83,11 @@ can be positioned and parented like everything else, and the renderer
 passes the visible lights to the shader as uniform arrays in view space, the
 same way it passes the matrices.
 
-**6. PBR material.** The glTF "metallic-roughness" material is the heart of
-the loader and the biggest single step. It is a fragment shader that takes
-base color, metalness, roughness, a normal map, occlusion and emission and
-computes reflected light for each light in the scene with a
+**6. PBR material** ([done](./pbr-material.md)). The glTF
+"metallic-roughness" material is the heart of the loader and the biggest
+single step. It is a fragment shader that takes base color, metalness,
+roughness, a normal map, occlusion and emission and computes reflected
+light for each light in the scene with a
 [BRDF](./concepts.md#what-a-brdf-is). The page for this step walks through
 the shader term by term.
 

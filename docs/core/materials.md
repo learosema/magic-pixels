@@ -17,9 +17,12 @@ const material = {
 
 `createShaderMaterial()` builds one from sources and uniforms;
 `createDefaultMaterial()`, `createBasicMaterial(color)` and
-`createNormalMaterial()` are ready-made ones. There is no material class and
-no lighting model built in: a material _is_ its shader. In three.js terms
-everything is a `RawShaderMaterial`.
+`createNormalMaterial()` are ready-made unlit ones, and
+`createPbrMaterial(options)` is the lit one: the glTF metallic-roughness
+model, described in [PBR material](../gltf/pbr-material.md). There is no
+material class: a material _is_ its shader plus its uniforms, and the PBR
+material is built the same way as any other. In three.js terms everything
+is a `RawShaderMaterial`.
 
 ## Shader sources per language
 
@@ -31,13 +34,18 @@ The built-in shaders are GLSL ES 3.00 (`#version 300 es`, `in`/`out`, an
 explicit `out vec4 fragColor`). User shaders may still be 1.00
 (`attribute`/`varying`, `gl_FragColor`); WebGL2 accepts both.
 
-## One program per material
+## One program per shader
 
-The renderer compiles and links one program per material and caches it in a
-map keyed by the material object. Every mesh that uses the same material
-object shares the program. If `glsl.vertex` or `glsl.fragment` is replaced
-by a different string, the cache notices on the next draw and recompiles.
-This makes live-editing a fragment shader a one-line change.
+The renderer compiles and links one program per distinct pair of shader
+sources and caches it by the source strings. Every mesh that uses the same
+material shares the program, and so do different materials whose sources
+happen to be identical, which is common: `createPbrMaterial()` produces the
+same source for every material with the same set of maps, whatever the
+factors. The program is deleted when the last material using it is
+disposed. If `glsl.vertex` or `glsl.fragment` is replaced by a different
+string, the cache notices on the next draw and compiles (or looks up) the
+program for the new source. This makes live-editing a fragment shader a
+one-line change.
 
 After linking, the renderer asks the program for its _active uniforms_: the
 uniforms the shader declares and actually uses (GLSL drops unused ones).
@@ -58,7 +66,7 @@ Two details make this robust:
   silently; the table in `src/webgl/uniforms.ts` maps every GLSL type to
   the right call.
 - **Unchanged values are skipped.** The renderer remembers the last uploaded
-  array per uniform and compares element by element. `uniformNfv` calls are
+  array per uniform of each program and compares element by element. `uniformNfv` calls are
   not free, and a scene with many meshes sharing a material would otherwise
   re-upload the same colour hundreds of times per frame. This is also why
   mutating a `Vector` in place works: the comparison looks at the numbers,
