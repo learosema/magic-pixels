@@ -23,6 +23,11 @@ import {
   type UniformInfo,
   type UniformValues,
 } from './uniforms';
+import {
+  collectLightUniforms,
+  createLightUniforms,
+  type LightUniforms,
+} from './light-uniforms';
 
 type GeometryResources = {
   vao: WebGLVertexArrayObject;
@@ -59,6 +64,46 @@ const RESERVED_ATTRIBUTE_LOCATIONS: [string, number][] = [
   ['uv', 2],
 ];
 
+/**
+ * The light uniform arrays and the number of array elements each light
+ * takes, grouped by light type with the `count` uniform of the group. A
+ * shader declares as many array entries as it can handle (its
+ * `MAX_..._LIGHTS`); the renderer pads or cuts the frame's lights to that
+ * length and clamps the count to the smallest declared array.
+ */
+const LIGHT_GROUPS: {
+  count: 'directionalLightCount' | 'pointLightCount';
+  arrays: [
+    keyof Omit<LightUniforms, 'directionalLightCount' | 'pointLightCount'>,
+    number,
+  ][];
+}[] = [
+  {
+    count: 'directionalLightCount',
+    arrays: [
+      ['directionalLightDirections', 3],
+      ['directionalLightColors', 3],
+    ],
+  },
+  {
+    count: 'pointLightCount',
+    arrays: [
+      ['pointLightPositions', 3],
+      ['pointLightColors', 3],
+      ['pointLightRanges', 1],
+    ],
+  },
+];
+
+/** Cut or zero-pad `values` to exactly `length` entries */
+function fitLength(values: number[], length: number): number[] {
+  const result = values.slice(0, length);
+  while (result.length < length) {
+    result.push(0);
+  }
+  return result;
+}
+
 function arraysEqual(a: UniformValues, b: UniformValues): boolean {
   if (a.length !== b.length) {
     return false;
@@ -80,7 +125,14 @@ function arraysEqual(a: UniformValues, b: UniformValues): boolean {
  * Shaders can declare the built-in uniforms `modelMatrix`, `viewMatrix`,
  * `projectionMatrix`, `modelViewMatrix` (mat4) and `normalMatrix` (mat3);
  * they are set per mesh from the scene graph and the camera, unless the
- * material defines a uniform of the same name.
+ * material defines a uniform of the same name. The same goes for the
+ * lights of the frame, in view space with colours premultiplied by
+ * intensity: `ambientLightColor` (vec3), `directionalLightDirections[]`
+ * and `directionalLightColors[]` (vec3 arrays) with
+ * `directionalLightCount` (int), and `pointLightPositions[]`,
+ * `pointLightColors[]` (vec3 arrays), `pointLightRanges[]` (float array)
+ * with `pointLightCount`. The array lengths are the shader's choice; lights
+ * beyond them are dropped. See {@link LightUniforms}.
  */
 export class WebGL2Renderer implements Renderer {
   gl: WebGL2RenderingContext;
@@ -95,6 +147,8 @@ export class WebGL2Renderer implements Renderer {
     RESERVED_ATTRIBUTE_LOCATIONS
   );
   private currentProgram: WebGLProgram | null = null;
+  /** the lights of the current frame, rebuilt by every `render` */
+  private lightUniforms = createLightUniforms();
 
   // render state, tracked to skip redundant GL calls between draws; the
   // initial values match the GL defaults plus the constructor's DEPTH_TEST
@@ -124,6 +178,7 @@ export class WebGL2Renderer implements Renderer {
   render(scene: Scene, camera: Camera): WebGL2Renderer {
     const { gl } = this;
     const frame = prepareScene(scene, camera);
+    collectLightUniforms(frame.lights, camera, this.lightUniforms);
     if (this.autoClear) {
       // clear honours the depth mask, which a transparent material drawn
       // last in the previous frame leaves switched off
@@ -401,8 +456,8 @@ export class WebGL2Renderer implements Renderer {
   // ---------------------------------------------------------------- uniforms
 
   /**
-   * Set the matrix uniforms the shader declares, unless the material
-   * provides a uniform of the same name.
+   * Set the matrix and light uniforms the shader declares, unless the
+   * material provides a uniform of the same name.
    */
   private setBuiltinUniforms(
     resources: MaterialResources,
@@ -412,7 +467,16 @@ export class WebGL2Renderer implements Renderer {
     const { uniforms } = mesh.material;
     const wants = (name: string) =>
       resources.uniforms.has(name) && !(name in uniforms);
+    this.setMatrixUniforms(resources, mesh, camera, wants);
+    this.setLightUniforms(resources, wants);
+  }
 
+  private setMatrixUniforms(
+    resources: MaterialResources,
+    mesh: Mesh,
+    camera: Camera,
+    wants: (name: string) => boolean
+  ): void {
     mesh.modelViewMatrix.multiplyMatrices(camera.viewMatrix, mesh.worldMatrix);
     if (wants('normalMatrix')) {
       mesh.normalMatrix.setNormalMatrix(mesh.modelViewMatrix);
@@ -437,6 +501,44 @@ export class WebGL2Renderer implements Renderer {
         'modelViewMatrix',
         mesh.modelViewMatrix.values
       );
+    }
+  }
+
+  /**
+   * Upload the frame's lights. Arrays are fitted to the length the shader
+   * declared; the count is clamped to the shortest declared array so a
+   * loop over it never reads past the end.
+   */
+  private setLightUniforms(
+    resources: MaterialResources,
+    wants: (name: string) => boolean
+  ): void {
+    const lights = this.lightUniforms;
+    if (wants('ambientLightColor')) {
+      this.uploadIfChanged(
+        resources,
+        'ambientLightColor',
+        lights.ambientLightColor
+      );
+    }
+    for (const group of LIGHT_GROUPS) {
+      let max = Infinity;
+      for (const [name, stride] of group.arrays) {
+        if (!wants(name)) {
+          continue;
+        }
+        const { size } = resources.uniforms.get(name)!;
+        max = Math.min(max, size);
+        this.uploadIfChanged(
+          resources,
+          name,
+          fitLength(lights[name], size * stride)
+        );
+      }
+      if (wants(group.count)) {
+        const count = Math.min(lights[group.count], max);
+        this.uploadIfChanged(resources, group.count, [count]);
+      }
     }
   }
 

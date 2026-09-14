@@ -28,6 +28,7 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [Typed vertex attributes](./gltf/typed-attributes.md)
 - [Texture extensions](./gltf/texture-extensions.md)
 - [Material render state](./gltf/material-render-state.md)
+- [Lights](./gltf/lights.md)
 
 ## Reading list
 

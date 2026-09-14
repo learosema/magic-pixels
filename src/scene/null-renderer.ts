@@ -2,8 +2,8 @@ import type { BufferGeometry } from '../geometries';
 import { Color } from '../utils';
 import type { Camera } from './camera';
 import type { Material } from './material';
+import type { Light } from './light';
 import type { Mesh } from './mesh';
-import type { Object3D } from './object3d';
 import { prepareScene } from './renderer';
 import type { Renderer } from './renderer';
 import type { Scene } from './scene';
@@ -17,8 +17,8 @@ export type NullFrame = {
   meshes: Mesh[];
   /** transparent meshes, sorted back to front */
   transparent: Mesh[];
-  /** visible lights; always empty until step 5 (`Light`) populates it */
-  lights: Object3D[];
+  /** visible lights, in scene-tree order */
+  lights: Light[];
 };
 
 /**

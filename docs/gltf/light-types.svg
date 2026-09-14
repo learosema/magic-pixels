@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="280" viewBox="0 0 680 280" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9822b"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b6fd9"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="679" height="279" rx="8" fill="#ffffff" stroke="#cccccc"/>
+
+  <!-- left panel: directional light -->
+  <text x="30" y="32" font-weight="600" fill="#222">Directional light</text>
+  <text x="30" y="50" fill="#555">parallel rays along the node's -Z axis</text>
+
+  <!-- the light node with its axes -->
+  <g transform="translate(90 120) rotate(35)">
+    <rect x="-14" y="-14" width="28" height="28" rx="4" fill="#f4f4f4" stroke="#333"/>
+    <line x1="0" y1="0" x2="0" y2="-52" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="6" y="-42" fill="#333" font-size="12">+Z</text>
+    <line x1="0" y1="0" x2="38" y2="0" stroke="#999" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <text x="26" y="-6" fill="#777" font-size="12">+X</text>
+  </g>
+  <text x="34" y="176" fill="#333" font-size="12">light node</text>
+
+  <!-- parallel rays: direction = -Z of the node, i.e. rotate(35) of (0, +1) -->
+  <g stroke="#d9822b" stroke-width="1.5" marker-end="url(#arrow-orange)">
+    <line x1="112" y1="92" x2="187" y2="145"/>
+    <line x1="128" y1="118" x2="203" y2="171"/>
+    <line x1="144" y1="144" x2="219" y2="197"/>
+  </g>
+  <text x="196" y="132" fill="#d9822b" font-size="12">direction (-Z)</text>
+
+  <!-- surface with normal and L -->
+  <line x1="180" y1="240" x2="300" y2="180" stroke="#333" stroke-width="2"/>
+  <g transform="translate(240 210)">
+    <line x1="0" y1="0" x2="26" y2="52" stroke="#2b6fd9" stroke-width="1.5" marker-end="url(#arrow-blue)" transform="rotate(180)"/>
+    <text x="-22" y="-58" fill="#2b6fd9" font-size="12">N</text>
+    <line x1="0" y1="0" x2="-45" y2="-32" stroke="#d9822b" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+    <text x="-122" y="-4" fill="#d9822b" font-size="12">L = -direction</text>
+  </g>
+  <text x="30" y="262" fill="#555" font-size="12">L is the same everywhere; only the node's orientation counts</text>
+
+  <!-- divider -->
+  <line x1="340" y1="20" x2="340" y2="260" stroke="#dddddd"/>
+
+  <!-- right panel: point light -->
+  <text x="370" y="32" font-weight="600" fill="#222">Point light</text>
+  <text x="370" y="50" fill="#555">rays from the node's position, fading with distance</text>
+
+  <!-- the light -->
+  <g transform="translate(470 110)">
+    <circle r="7" fill="#ffb15e" stroke="#333"/>
+    <g stroke="#d9822b" stroke-width="1.2" opacity="0.7">
+      <line x1="0" y1="-10" x2="0" y2="-26"/>
+      <line x1="10" y1="0" x2="26" y2="0"/>
+      <line x1="-10" y1="0" x2="-26" y2="0"/>
+      <line x1="7" y1="-7" x2="18" y2="-18"/>
+      <line x1="-7" y1="-7" x2="-18" y2="-18"/>
+      <line x1="-7" y1="7" x2="-18" y2="18"/>
+    </g>
+  </g>
+  <text x="484" y="98" fill="#333" font-size="12">position</text>
+
+  <!-- surface with two points at different distances -->
+  <line x1="380" y1="230" x2="640" y2="230" stroke="#333" stroke-width="2"/>
+
+  <g transform="translate(500 230)">
+    <line x1="0" y1="0" x2="0" y2="-40" stroke="#2b6fd9" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+    <text x="5" y="-30" fill="#2b6fd9" font-size="12">N</text>
+    <line x1="0" y1="0" x2="-24" y2="-96" stroke="#d9822b" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+    <text x="-50" y="-60" fill="#d9822b" font-size="12">L, d</text>
+  </g>
+
+  <g transform="translate(610 230)">
+    <line x1="0" y1="0" x2="0" y2="-40" stroke="#2b6fd9" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+    <text x="5" y="-30" fill="#2b6fd9" font-size="12">N</text>
+    <line x1="0" y1="0" x2="-126" y2="-108" stroke="#d9822b" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow-orange)"/>
+    <text x="-40" y="-60" fill="#d9822b" font-size="12">farther</text>
+  </g>
+  <text x="370" y="262" fill="#555" font-size="12">L = normalize(position − P) per fragment, intensity × 1/d²</text>
+</svg>

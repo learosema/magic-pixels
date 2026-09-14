@@ -34,6 +34,10 @@ import {
   PerspectiveCamera,
   OrthographicCamera,
   Mesh,
+  Light,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
   NullRenderer,
   prepareScene,
   Filter,
@@ -58,6 +62,7 @@ import type {
   Uniforms,
 } from './scene';
 import { WebGL2Renderer, setUniform } from './webgl';
+import type { LightUniforms } from './webgl';
 
 export type {
   Renderer,
@@ -71,6 +76,7 @@ export type {
   ShaderSource,
   BufferGroup,
   TypedArray,
+  LightUniforms,
 };
 
 export {
@@ -88,6 +94,10 @@ export {
   PerspectiveCamera,
   OrthographicCamera,
   Mesh,
+  Light,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
   NullRenderer,
   WebGL2Renderer,
   prepareScene,

@@ -6,6 +6,7 @@ children:
   - ./typed-attributes.md
   - ./texture-extensions.md
   - ./material-render-state.md
+  - ./lights.md
 ---
 
 # Loading glTF models
@@ -75,10 +76,11 @@ and `side` fields and the renderer sets the blend and cull state per draw.
 Transparent meshes also have to be drawn last and back to front, which
 changes what `prepareScene()` returns.
 
-**5. Lights.** A physically based material is meaningless without lights. A
-light becomes an {@link Object3D} subclass so it can be positioned and
-parented like everything else, and the renderer passes the visible lights to
-the shader as uniform arrays, the same way it passes the matrices.
+**5. Lights** ([done](./lights.md)). A physically based material is
+meaningless without lights. A light is an {@link Object3D} subclass so it
+can be positioned and parented like everything else, and the renderer
+passes the visible lights to the shader as uniform arrays in view space, the
+same way it passes the matrices.
 
 **6. PBR material.** The glTF "metallic-roughness" material is the heart of
 the loader and the biggest single step. It is a fragment shader that takes
