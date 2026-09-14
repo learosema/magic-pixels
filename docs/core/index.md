@@ -32,18 +32,20 @@ so the camera sits at the origin looking down -Z. The `projectionMatrix` then
 squashes the visible volume into the cube the GPU clips against.
 [Cameras and coordinates](./cameras.md) derives both.
 
-## Meshes are collected
+## Meshes and lights are collected
 
-`prepareScene()` returns the visible {@link Mesh}es in tree order.
-Each mesh is a {@link BufferGeometry} (the vertex data) plus a
-{@link Material} (the shader and its uniforms).
+`prepareScene()` returns the visible {@link Mesh}es in tree order, opaque
+first and transparent ones sorted back to front, and the visible
+{@link Light}s. Each mesh is a {@link BufferGeometry} (the vertex data)
+plus a {@link Material} (the shader and its uniforms).
 
 ## GPU programs per mesh
 
 For every mesh, the renderer looks up or creates the GPU program for
 the material and the vertex array object for the geometry, uploads the
-uniforms that changed, including the matrices from steps 1 and 2, binds
-the textures, and issues one draw call.
+uniforms that changed, including the matrices from steps 1 and 2 and the
+lights converted into the camera's space, binds the textures, and issues
+one draw call.
 
 ## See also
 

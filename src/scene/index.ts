@@ -12,6 +12,7 @@ import { Object3D } from './object3d';
 import { Scene } from './scene';
 import { Camera, PerspectiveCamera, OrthographicCamera } from './camera';
 import { Mesh } from './mesh';
+import { Light, AmbientLight, DirectionalLight, PointLight } from './light';
 import {
   createDefaultMaterial,
   createBasicMaterial,
@@ -44,6 +45,10 @@ export {
   PerspectiveCamera,
   OrthographicCamera,
   Mesh,
+  Light,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
   NullRenderer,
   prepareScene,
   Filter,

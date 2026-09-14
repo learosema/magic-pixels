@@ -55,10 +55,11 @@ grazing angle gets less, in proportion to `max(dot(N, L), 0.0)` where `N` is
 the surface normal and `L` the direction towards the light. That single dot
 product is Lambert's law and is where all shading starts.
 
-The renderer will pass lights to the shader in _view space_, the coordinate
+The renderer passes lights to the shader in _view space_, the coordinate
 system of the camera, because the vertex shader already produces the position
 and normal in view space (`vPosition`, `vNormal` in the default shader).
-Everything in the lighting equation must be in the same space.
+Everything in the lighting equation must be in the same space. The
+[Lights](./lights.md) page has the three light types and the uniforms.
 
 ## What a BRDF is
 

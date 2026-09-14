@@ -16,6 +16,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - a scene graph: `Object3D` with `position`, `quaternion`/`rotation`, `scale`, `children`; `Scene`, `Mesh` and the cameras (`PerspectiveCamera`, `OrthographicCamera`) are `Object3D`s
 - a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders a `Scene` through a `Camera` and owns all GPU resources (programs, vertex array objects, buffers, textures)
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
+- lights as scene graph nodes (`AmbientLight`, `DirectionalLight`, `PointLight`), passed to shaders as built-in uniforms in view space
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
@@ -59,7 +60,7 @@ const renderer = new NullRenderer();
 renderer.render(scene, camera);
 renderer.lastFrame.meshes; // opaque meshes, in tree order
 renderer.lastFrame.transparent; // transparent meshes, sorted back to front
-renderer.lastFrame.lights; // visible lights (always empty for now)
+renderer.lastFrame.lights; // visible lights, in tree order
 ```
 
 ### Create a geometry
@@ -184,6 +185,30 @@ const to = Quaternion.fromAxisAngle(new Vector(1, 1, 0).normalized, Math.PI);
 mesh.quaternion.slerpQuaternions(from, to, t); // t from 0 to 1
 ```
 
+### Lights
+
+Lights are `Object3D`s: add them to the scene, move them, parent them, hide them. An
+`AmbientLight` adds a flat colour everywhere, a `DirectionalLight` shines along its own -Z axis
+(aim it with `lookAt()`, like a camera) and a `PointLight` radiates from its position with
+inverse-square falloff, optionally cut off at a `range` (`0`, the default, means no cutoff).
+Each has a `color` (a `Color` or a hex string, taken as linear RGB) and an `intensity`.
+
+```js
+scene.add(new AmbientLight('#202840', 0.5));
+const sun = new DirectionalLight('#fff1d6', 0.9);
+sun.position.set(5, 5, 5);
+sun.lookAt(new Vector(0, 0, 0));
+scene.add(sun);
+const bulb = new PointLight('#ffb15e', 6, 10); // colour, intensity, range
+bulb.position.set(0, 2, 0);
+scene.add(bulb);
+```
+
+There is no built-in lit material yet: a shader reads the lights through the built-in uniforms
+described in the next section. The
+[lights example](https://learosema.github.io/magic-pixels/examples/08-lights/) has a complete
+Lambert shader.
+
 ### Writing shaders
 
 Attribute locations are fixed by name, so no `layout(location = ...)` qualifiers are needed and
@@ -194,6 +219,20 @@ The renderer sets the built-in uniforms `modelMatrix`, `viewMatrix`, `projection
 `modelViewMatrix` (all `mat4`) and `normalMatrix` (`mat3`, the inverse transpose of the model-view
 matrix) for every shader that declares them, unless the material defines a uniform of the same
 name. The built-in vertex shader uses `modelViewMatrix`, `projectionMatrix` and `normalMatrix`.
+
+The lights of the frame are built-in uniforms as well, in view space with colours premultiplied
+by intensity: `ambientLightColor` (`vec3`), `directionalLightDirections[]` (the direction each
+light shines in) and `directionalLightColors[]` (`vec3` arrays) with `directionalLightCount`
+(`int`), and `pointLightPositions[]`, `pointLightColors[]` (`vec3` arrays), `pointLightRanges[]`
+(`float` array) with `pointLightCount`. Declare the arrays as large as your shader can handle;
+the renderer pads them, drops lights beyond the size and clamps the counts:
+
+```glsl
+#define MAX_POINT_LIGHTS 4
+uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
+uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
+uniform int pointLightCount;
+```
 
 ```glsl
 #version 300 es

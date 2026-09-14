@@ -34,22 +34,23 @@ tree walk (`scene.updateWorldMatrix()`, plus the camera's if the camera is
 not in the scene) and collects the visible {@link Mesh}es depth-first,
 skipping invisible subtrees, into a {@link Frame}: `meshes`, the opaque ones
 in tree order, `transparent` (`material.transparent === true`), sorted back
-to front by view-space depth, and `lights`, reserved for the visible
-lights (nothing fills it yet). Opaque meshes can draw in any order because the
-depth test sorts them out per pixel; blended meshes cannot, so they draw
-last, farthest first, in the order that composites correctly.
+to front by view-space depth, and `lights`, the visible {@link Light}s in
+tree order. Opaque meshes can draw in any order because the depth test
+sorts them out per pixel; blended meshes cannot, so they draw last,
+farthest first, in the order that composites correctly.
 
 ## One frame in WebGL2Renderer
 
 ```
 frame = prepareScene(scene, camera)
+convert frame.lights into view-space uniform arrays, once per frame
 if autoClear: clear colour and depth
 for each mesh in frame.meshes, then frame.transparent:
   materialResources = program + uniform table for mesh.material   (cached)
   geometryResources = VAO + buffers for mesh.geometry               (cached)
   useProgram if it differs from the current one
   apply the material's blend/cull/depth state, skipping calls that would be a no-op
-  set built-in matrix uniforms the shader declares
+  set built-in matrix and light uniforms the shader declares
   set material uniforms that changed, binding textures to units
   bindVertexArray
   drawElements or drawArrays with the material's draw mode
@@ -65,7 +66,18 @@ is automatic and the scene layer never learns what a program is.
 `gl.useProgram` is skipped when consecutive meshes share a material, and
 uniform uploads are skipped when values did not change, so a hundred meshes
 with one material cost a hundred draw calls but one program switch and one
-set of material uniforms.
+set of material uniforms. The light uniforms go through the same cache:
+they are the same for every mesh in a frame, so each material uploads them
+once and only again when a light moves or changes colour.
+
+## Built-in uniforms
+
+Besides the matrices, the renderer fills the light uniforms a shader
+declares (`ambientLightColor`, the `directionalLight*` and `pointLight*`
+arrays and counts), in view space and premultiplied by intensity. The
+shader chooses the array sizes; the renderer pads, cuts and clamps the
+counts to fit. [Materials and uniforms](./materials.md#built-in-uniforms)
+lists them and [Lights](../gltf/lights.md) explains the values.
 
 ## Render state
 
@@ -109,13 +121,14 @@ Two tools cover the two layers:
 
 - Scene code is tested through {@link NullRenderer}: render, then inspect
   `renderer.lastFrame.meshes` and `.transparent` for what would have been
-  drawn and in which order, `.lights` for the visible lights, or
-  `renderer.disposed` for what was freed.
+  drawn and in which order, `.lights` for the lights that would have lit
+  them, or `renderer.disposed` for what was freed.
 - The WebGL2 renderer is tested against a fake `WebGL2RenderingContext`
   (`src/test-utils/fake-webgl2.ts`). It records every call with its
   arguments, counts objects created and deleted, and answers the queries
   the renderer relies on, active attributes and uniforms, by parsing the
-  shader sources with regular expressions. A test can assert that a shared
+  shader sources with regular expressions (array sizes may be `#define`d
+  constants, as in real shaders). A test can assert that a shared
   material compiled one program, that an attribute got location 1, or that
   an unchanged uniform was not uploaded twice. Nothing is actually drawn,
   which is the point: the tests check the bookkeeping, and the bookkeeping

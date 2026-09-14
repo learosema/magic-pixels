@@ -5,6 +5,7 @@ import {
   createFakeWebGL2,
   type FakeWebGL2,
 } from '../test-utils/fake-webgl2';
+import { AmbientLight, DirectionalLight, PointLight } from '../scene/light';
 import { createShaderMaterial } from '../scene/material';
 import { Mesh } from '../scene/mesh';
 import { Object3D } from '../scene/object3d';
@@ -37,6 +38,21 @@ uniform sampler2D map;
 uniform sampler2D map2;
 out vec4 fragColor;
 void main() { fragColor = color; }`;
+
+const LIT_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+#define MAX_DIRECTIONAL_LIGHTS 2
+#define MAX_POINT_LIGHTS 2
+uniform vec3 ambientLightColor;
+uniform vec3 directionalLightDirections[MAX_DIRECTIONAL_LIGHTS];
+uniform vec3 directionalLightColors[MAX_DIRECTIONAL_LIGHTS];
+uniform int directionalLightCount;
+uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
+uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
+uniform float pointLightRanges[MAX_POINT_LIGHTS];
+uniform int pointLightCount;
+out vec4 fragColor;
+void main() { fragColor = vec4(ambientLightColor, 1.0); }`;
 
 function createTriangle(): BufferGeometry {
   const geometry = new BufferGeometry();
@@ -732,6 +748,121 @@ void main() { gl_Position = projectionMatrix * vec4(position, 1.0); }`;
       expect(gl.callsTo('blendFunc')).toHaveLength(0);
       expect(gl.callsTo('cullFace')).toHaveLength(0);
       expect(gl.callsTo('depthMask')).toHaveLength(0);
+    });
+  });
+
+  describe('light uniforms', () => {
+    /** uploaded light uniforms by name, in upload order */
+    const lightUploads = (): [string, number[]][] =>
+      gl.calls
+        .filter(({ name }) =>
+          ['uniform3fv', 'uniform1fv', 'uniform1iv'].includes(name)
+        )
+        .map(({ args }) => [
+          (args[0] as { name: string }).name,
+          Array.from(args[1] as ArrayLike<number>),
+        ]);
+
+    test('injects the lights of the frame in view space, fitted to the declared array lengths', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, LIT_FRAGMENT_SHADER);
+      const scene = new Scene();
+      const sun = new DirectionalLight('#ffffff', 2);
+      sun.position.set(0, 5, 5);
+      sun.lookAt(new Vector(0, 0, 0));
+      const bulb = new PointLight('#ff0000', 4, 10);
+      bulb.position.set(1, 2, 0);
+      scene.add(
+        new AmbientLight('#0000ff', 0.5),
+        sun,
+        bulb,
+        new Mesh(createTriangle(), material)
+      );
+      const camera = new PerspectiveCamera();
+      camera.position.set(0, 0, 5);
+      renderer.render(scene, camera);
+
+      const uploads = new Map(lightUploads());
+      expectClose(uploads.get('ambientLightColor')!, [0, 0, 0.5]);
+      // one light, padded to MAX_DIRECTIONAL_LIGHTS = 2
+      expectClose(uploads.get('directionalLightDirections')!, [
+        0,
+        -Math.SQRT1_2,
+        -Math.SQRT1_2,
+        0,
+        0,
+        0,
+      ]);
+      expectClose(uploads.get('directionalLightColors')!, [2, 2, 2, 0, 0, 0]);
+      expect(uploads.get('directionalLightCount')).toEqual([1]);
+      expectClose(uploads.get('pointLightPositions')!, [1, 2, -5, 0, 0, 0]);
+      expectClose(uploads.get('pointLightColors')!, [4, 0, 0, 0, 0, 0]);
+      expect(uploads.get('pointLightRanges')).toEqual([10, 0]);
+      expect(uploads.get('pointLightCount')).toEqual([1]);
+    });
+
+    test('drops lights beyond the declared array length and clamps the count', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, LIT_FRAGMENT_SHADER);
+      const scene = new Scene();
+      const bulbs = [new PointLight(), new PointLight(), new PointLight()];
+      bulbs.forEach((bulb, i) => bulb.position.set(i + 1, 0, 0));
+      scene.add(...bulbs, new Mesh(createTriangle(), material));
+      renderer.render(scene, new PerspectiveCamera());
+
+      const uploads = new Map(lightUploads());
+      expectClose(uploads.get('pointLightPositions')!, [1, 0, 0, 2, 0, 0]);
+      expect(uploads.get('pointLightCount')).toEqual([2]);
+    });
+
+    test('uploads nothing for shaders that declare no light uniforms', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+      const scene = new Scene();
+      scene.add(
+        new AmbientLight(),
+        new PointLight(),
+        new Mesh(createTriangle(), material)
+      );
+      renderer.render(scene, new PerspectiveCamera());
+      expect(lightUploads()).toEqual([]);
+    });
+
+    test('re-uploads only what changed when a light moves', () => {
+      const material = createShaderMaterial(VERTEX_SHADER, LIT_FRAGMENT_SHADER);
+      const scene = new Scene();
+      const bulb = new PointLight();
+      scene.add(new AmbientLight(), bulb, new Mesh(createTriangle(), material));
+      const camera = new PerspectiveCamera();
+      renderer.render(scene, camera);
+      const firstFrame = lightUploads().length;
+      expect(firstFrame).toBe(8);
+
+      renderer.render(scene, camera);
+      expect(lightUploads()).toHaveLength(firstFrame);
+
+      bulb.position.x = 3;
+      renderer.render(scene, camera);
+      expect(lightUploads().slice(firstFrame)).toEqual([
+        ['pointLightPositions', [3, 0, 0, 0, 0, 0]],
+      ]);
+    });
+
+    test('material uniforms take precedence over the built-in light uniforms', () => {
+      const material = createShaderMaterial(
+        VERTEX_SHADER,
+        LIT_FRAGMENT_SHADER,
+        {
+          ambientLightColor: [1, 1, 1],
+        }
+      );
+      const scene = new Scene();
+      scene.add(
+        new AmbientLight('#ff0000'),
+        new Mesh(createTriangle(), material)
+      );
+      renderer.render(scene, new PerspectiveCamera());
+      const ambient = lightUploads().filter(
+        ([name]) => name === 'ambientLightColor'
+      );
+      expect(ambient).toEqual([['ambientLightColor', [1, 1, 1]]]);
     });
   });
 });

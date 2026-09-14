@@ -4,9 +4,9 @@ title: Scene graph
 
 # Scene graph
 
-A scene is a tree. {@link Scene} is the root, {@link Mesh}es, cameras and
-plain {@link Object3D}s are the nodes, and every node's transform is relative
-to its parent. The whole point of the tree is that "relative to the parent"
+A scene is a tree. {@link Scene} is the root, {@link Mesh}es, cameras,
+{@link Light}s and plain {@link Object3D}s are the nodes, and every node's
+transform is relative to its parent. The whole point of the tree is that "relative to the parent"
 composes: move the parent and every descendant moves with it.
 
 ## What an Object3D holds
@@ -82,7 +82,8 @@ are the standard tool in any scene graph; a glTF file is full of them.
 `object.lookAt(target)` rotates the object so that its +Z axis points at
 `target`, a point in the _parent's_ coordinate system (the same system as
 `position`). A camera's viewing direction is -Z, so {@link Camera} overrides
-`lookAt` to point -Z at the target; both share `Mat4.lookAt`, which builds a
+`lookAt` to point -Z at the target, and {@link DirectionalLight}, which
+shines along -Z, does the same; all share `Mat4.lookAt`, which builds a
 rotation from a forward vector and an `up` hint by two cross products.
 
 The resulting matrix goes into `setRotationFromMatrix()`, which sets

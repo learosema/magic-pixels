@@ -4,7 +4,8 @@
  * relies on by parsing the shader sources:
  *
  * - active attributes: `in`/`attribute` declarations in the vertex shader
- * - active uniforms: `uniform` declarations in both shaders
+ * - active uniforms: `uniform` declarations in both shaders; an array
+ *   size may be a number or a `#define`d constant
  *
  * A shader whose source contains `COMPILE_ERROR` fails to compile.
  */
@@ -110,7 +111,21 @@ const CONSTANTS = {
 const ATTRIBUTE_RE =
   /^\s*(?:layout\s*\([^)]*\)\s*)?(?:in|attribute)\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+(\w+)\s*;/gm;
 const UNIFORM_RE =
-  /^\s*uniform\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+(\w+)(?:\s*\[\s*(\d+)\s*\])?\s*;/gm;
+  /^\s*uniform\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+(\w+)(?:\s*\[\s*(\w+)\s*\])?\s*;/gm;
+const DEFINE_RE = /^\s*#define\s+(\w+)\s+(\d+)\s*$/gm;
+
+/** resolve an array size that is a number or a `#define`d name */
+function arraySize(size: string, source: string): number {
+  if (/^\d+$/.test(size)) {
+    return parseInt(size, 10);
+  }
+  for (const [, name, value] of source.matchAll(DEFINE_RE)) {
+    if (name === size) {
+      return parseInt(value, 10);
+    }
+  }
+  throw Error(`fake-webgl2: unknown array size ${size}`);
+}
 
 function activeAttributes(program: Program): WebGLActiveInfo[] {
   const vertex = program.shaders.find(
@@ -138,7 +153,7 @@ function activeUniforms(program: Program): WebGLActiveInfo[] {
       result.push({
         name: size ? `${name}[0]` : name,
         type: GLSL_TYPES[type] ?? 0,
-        size: size ? parseInt(size, 10) : 1,
+        size: size ? arraySize(size, shader.source) : 1,
       });
     }
   }

@@ -90,6 +90,16 @@ built-in vertex shader uses `modelViewMatrix`, `projectionMatrix` and
 `normalMatrix` and passes `vPosition` (view space), `vNormal` (view space,
 normalised) and `vUv` to the fragment shader.
 
+The lights of the frame are built-in uniforms too, filled once per frame
+from the visible {@link Light}s, in view space, with colours premultiplied
+by intensity: `ambientLightColor` (`vec3`), `directionalLightDirections[]`
+and `directionalLightColors[]` (`vec3` arrays) with
+`directionalLightCount` (`int`), and `pointLightPositions[]`,
+`pointLightColors[]` (`vec3` arrays), `pointLightRanges[]` (`float` array)
+with `pointLightCount`. The shader picks the array sizes; the renderer fits
+the lights to them and clamps the counts. [Lights](../gltf/lights.md)
+explains what the values mean and shows a fragment shader that uses them.
+
 ## Render state
 
 Besides shaders and uniforms, a material carries the GPU state a shader

@@ -76,9 +76,9 @@ left unset:
 {@link Frame} - `{ meshes, transparent, lights }` instead of a flat list -
 splitting opaque meshes (tree order) from transparent ones, which it sorts
 back to front by the Z coordinate of `viewMatrix * worldMatrix`, i.e.
-distance from the camera along its viewing direction. `lights` is a
-placeholder for now, always `[]`: step 5 introduces `Light` and starts
-collecting them here. `WebGL2Renderer` draws `meshes` then `transparent`,
+distance from the camera along its viewing direction. `lights` holds the
+visible {@link Light}s (see [Lights](./lights.md)). `WebGL2Renderer`
+draws `meshes` then `transparent`,
 and before each draw applies the material's blend, cull and depth state -
 skipping any GL call whose value did not change since the last mesh, the
 same principle as the uniform cache. `NullRenderer` records the same split
