@@ -34,7 +34,8 @@ space and converts at the borders:
   and must _not_ be decoded.
 - **Output:** the final linear color is encoded back to sRGB before it is
   written to the canvas. The approximation `pow(color, 1.0 / 2.2)` is close
-  enough for a learning renderer; the exact curve has a linear toe near black.
+  enough for a hand-written shader; the exact curve has a linear toe near
+  black, and the PBR material uses it.
 
 The rule of thumb: if a texture is something you would look at as a picture,
 it is sRGB. If it is numbers that happen to be stored as an image, it is
@@ -80,11 +81,11 @@ The glTF material uses one specific BRDF with two halves:
   rough one spreads it out (a broad, dim highlight).
 
 The specular half is the _Cook-Torrance_ model, a product of three terms that
-the PBR step will go through one by one: a distribution term (how many
-microscopic facets point the right way, controlled by roughness), a
-geometry term (how many of those facets are shadowed by their neighbours),
-and a Fresnel term (surfaces reflect more at grazing angles; look at a lake
-from above versus from the shore).
+the [PBR material](./pbr-material.md) page goes through one by one: a
+distribution term (how many microscopic facets point the right way,
+controlled by roughness), a geometry term (how many of those facets are
+shadowed by their neighbours), and a Fresnel term (surfaces reflect more at
+grazing angles; look at a lake from above versus from the shore).
 
 ## Metallic and roughness
 

@@ -148,10 +148,50 @@ describe('WebGL2Renderer', () => {
     );
     draw(a, b);
     draw(a, b);
-    expect(gl.created.programs).toBe(2);
     expect(gl.created.vertexArrays).toBe(1);
     expect(gl.created.buffers).toBe(2);
     expect(gl.callsTo('bufferData')).toHaveLength(2);
+  });
+
+  test('shares one program between materials with identical shader sources', () => {
+    const a = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
+      color: Color.fromHex('#ff0000'),
+    });
+    const b = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
+      color: Color.fromHex('#0000ff'),
+    });
+    const c = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER + ' ');
+    const meshes = [a, b, c].map((m) => new Mesh(createTriangle(), m));
+    draw(...meshes);
+    draw(...meshes);
+    expect(gl.created.programs).toBe(2);
+    // the uniform cache is per program, so a and b overwrite each other's
+    // colour on every frame instead of a's second upload being skipped
+    const colors = gl
+      .callsTo('uniform4fv')
+      .filter(({ args }) => (args[0] as { name: string }).name === 'color')
+      .map(({ args }) => Array.from(args[1] as number[]));
+    expect(colors).toEqual([
+      [1, 0, 0, 1],
+      [0, 0, 1, 1],
+      [1, 0, 0, 1],
+      [0, 0, 1, 1],
+    ]);
+  });
+
+  test('keeps a shared program until the last material using it is disposed', () => {
+    const a = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+    const b = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER);
+    draw(new Mesh(createTriangle(), a), new Mesh(createTriangle(), b));
+    renderer.dispose(a);
+    expect(gl.deleted.programs).toBe(0);
+    draw(new Mesh(createTriangle(), b));
+    expect(gl.created.programs).toBe(1);
+    renderer.dispose(b);
+    expect(gl.deleted.programs).toBe(1);
+    // rendering with it again compiles a fresh program
+    draw(new Mesh(createTriangle(), a));
+    expect(gl.created.programs).toBe(2);
   });
 
   test('uploads an index buffer for indexed geometries and draws with drawElements', () => {

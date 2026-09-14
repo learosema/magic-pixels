@@ -46,7 +46,7 @@ frame = prepareScene(scene, camera)
 convert frame.lights into view-space uniform arrays, once per frame
 if autoClear: clear colour and depth
 for each mesh in frame.meshes, then frame.transparent:
-  materialResources = program + uniform table for mesh.material   (cached)
+  program + uniform table for mesh.material's shader sources       (cached)
   geometryResources = VAO + buffers for mesh.geometry               (cached)
   useProgram if it differs from the current one
   apply the material's blend/cull/depth state, skipping calls that would be a no-op
@@ -60,8 +60,10 @@ bindVertexArray(null)
 The two `(cached)` lines are where all the GL setup lives. Each is a
 "get or create": look the scene object up in a map, validate the cached
 resources (material: same shader sources; geometry: same `version`), and
-rebuild on mismatch. Because everything is keyed by object identity, sharing
-is automatic and the scene layer never learns what a program is.
+rebuild on mismatch. Geometries are keyed by object identity; programs are
+keyed by their source strings, so materials with identical shaders share
+one. Either way sharing is automatic and the scene layer never learns what
+a program is.
 
 `gl.useProgram` is skipped when consecutive meshes share a material, and
 uniform uploads are skipped when values did not change, so a hundred meshes

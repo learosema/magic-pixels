@@ -29,6 +29,7 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [Texture extensions](./gltf/texture-extensions.md)
 - [Material render state](./gltf/material-render-state.md)
 - [Lights](./gltf/lights.md)
+- [PBR material](./gltf/pbr-material.md)
 
 ## Reading list
 

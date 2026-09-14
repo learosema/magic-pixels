@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="300" viewBox="0 0 680 300" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9822b"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b6fd9"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2e9e5b"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="679" height="299" rx="8" fill="#ffffff" stroke="#cccccc"/>
+
+  <!-- left panel: the vectors of the BRDF -->
+  <text x="30" y="32" font-weight="600" fill="#222">The vectors of the BRDF</text>
+  <text x="30" y="50" fill="#555">all unit length, all in the same space</text>
+
+  <!-- surface -->
+  <line x1="40" y1="230" x2="320" y2="230" stroke="#333" stroke-width="2"/>
+  <g stroke="#bbb" stroke-width="1">
+    <line x1="60" y1="230" x2="50" y2="242"/>
+    <line x1="90" y1="230" x2="80" y2="242"/>
+    <line x1="120" y1="230" x2="110" y2="242"/>
+    <line x1="150" y1="230" x2="140" y2="242"/>
+    <line x1="180" y1="230" x2="170" y2="242"/>
+    <line x1="210" y1="230" x2="200" y2="242"/>
+    <line x1="240" y1="230" x2="230" y2="242"/>
+    <line x1="270" y1="230" x2="260" y2="242"/>
+    <line x1="300" y1="230" x2="290" y2="242"/>
+  </g>
+  <circle cx="180" cy="230" r="3" fill="#333"/>
+  <text x="188" y="250" fill="#333" font-size="12">P</text>
+
+  <!-- N: straight up -->
+  <line x1="180" y1="230" x2="180" y2="100" stroke="#333" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="186" y="104" fill="#333" font-weight="600">N</text>
+
+  <!-- L: towards the light, 50 degrees from N to the left -->
+  <line x1="180" y1="230" x2="80" y2="146" stroke="#d9822b" stroke-width="1.8" marker-end="url(#arrow-orange)"/>
+  <text x="62" y="142" fill="#d9822b" font-weight="600">L</text>
+  <text x="46" y="158" fill="#d9822b" font-size="12">to the light</text>
+
+  <!-- V: towards the camera, 25 degrees from N to the right -->
+  <line x1="180" y1="230" x2="235" y2="112" stroke="#2b6fd9" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <text x="240" y="110" fill="#2b6fd9" font-weight="600">V</text>
+  <text x="240" y="126" fill="#2b6fd9" font-size="12">to the camera</text>
+
+  <!-- H: halfway between L and V (about 12 degrees left of N) -->
+  <line x1="180" y1="230" x2="153" y2="103" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#arrow-green)"/>
+  <text x="128" y="100" fill="#2e9e5b" font-weight="600">H</text>
+  <text x="96" y="116" fill="#2e9e5b" font-size="12">half vector</text>
+
+  <!-- angle marks -->
+  <path d="M 180 190 A 40 40 0 0 0 149 204" fill="none" stroke="#d9822b" stroke-width="1"/>
+  <text x="140" y="200" fill="#d9822b" font-size="11">θ</text>
+  <path d="M 180 200 A 30 30 0 0 1 193 202" fill="none" stroke="#2b6fd9" stroke-width="1"/>
+
+  <text x="30" y="278" fill="#555" font-size="12">Lambert: cos θ = dot(N, L).  Specular: how many facets point along H = normalize(L + V).</text>
+
+  <!-- right panel: microfacets -->
+  <text x="380" y="32" font-weight="600" fill="#222">Microfacets</text>
+  <text x="380" y="50" fill="#555">what roughness describes</text>
+
+  <!-- smooth surface -->
+  <text x="380" y="96" fill="#333" font-size="12">roughness 0.1</text>
+  <polyline points="380,130 400,128 420,131 440,129 460,131 480,128 500,130 520,129 540,131 560,129 580,130 600,128 620,130 640,129 660,131"
+            fill="none" stroke="#333" stroke-width="1.5"/>
+  <g stroke="#2e9e5b" stroke-width="1" marker-end="url(#arrow-green)">
+    <line x1="420" y1="131" x2="421" y2="112"/>
+    <line x1="480" y1="128" x2="479" y2="109"/>
+    <line x1="540" y1="131" x2="541" y2="112"/>
+    <line x1="600" y1="128" x2="599" y2="109"/>
+  </g>
+  <text x="380" y="154" fill="#777" font-size="11">facet normals agree: sharp, bright highlight</text>
+
+  <!-- rough surface -->
+  <text x="380" y="192" fill="#333" font-size="12">roughness 0.8</text>
+  <polyline points="380,232 396,214 412,238 430,220 446,242 462,216 478,236 496,222 512,240 530,214 546,236 562,224 578,242 596,218 612,238 628,226 644,240 660,220"
+            fill="none" stroke="#333" stroke-width="1.5"/>
+  <g stroke="#2e9e5b" stroke-width="1" marker-end="url(#arrow-green)">
+    <line x1="404" y1="226" x2="392" y2="211"/>
+    <line x1="454" y1="229" x2="466" y2="214"/>
+    <line x1="521" y1="227" x2="510" y2="212"/>
+    <line x1="587" y1="230" x2="600" y2="216"/>
+    <line x1="636" y1="233" x2="624" y2="218"/>
+  </g>
+  <text x="380" y="266" fill="#777" font-size="11">facet normals scatter: broad, dim highlight</text>
+  <text x="380" y="282" fill="#777" font-size="11">D(H) counts the facets whose normal is H</text>
+</svg>
