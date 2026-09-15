@@ -10,6 +10,7 @@ children:
   - ./pbr-material.md
   - ./loader-core.md
   - ./bounding-volumes.md
+  - ./compression.md
 ---
 
 # Loading glTF models
@@ -104,10 +105,12 @@ that fell out of the loader's demo: framing a model needs its extent, so
 graph gets world-space versions for a subtree, and the loader fills the
 boxes from the `min`/`max` every glTF position accessor carries.
 
-**8. Compression.** Mesh compression shrinks files several times over.
-Quantization comes for free with step 2. Meshopt and Draco need a decoder
-that we do not bundle; the user passes it in and the loader calls it for the
-buffer views or primitives that are marked as compressed.
+**8. Compression** ([done](./compression.md)). Mesh compression shrinks
+files several times over. Quantization comes for free with step 2;
+`EXT_meshopt_compression` and `KHR_draco_mesh_compression` need a decoder
+that magic-pixels does not bundle, so the user passes one in and the
+loader calls it for the buffer views or primitives that are marked as
+compressed.
 
 **9. Documentation.** The README and these pages.
 

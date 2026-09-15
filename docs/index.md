@@ -32,6 +32,7 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [PBR material](./gltf/pbr-material.md)
 - [Loader core](./gltf/loader-core.md)
 - [Bounding volumes](./gltf/bounding-volumes.md)
+- [Compression](./gltf/compression.md)
 
 ## Reading list
 

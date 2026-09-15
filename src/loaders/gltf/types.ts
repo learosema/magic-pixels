@@ -76,6 +76,30 @@ export type GltfBuffer = {
   /** relative URL or data URI; absent for the binary chunk of a `.glb` */
   uri?: string;
   byteLength: number;
+  extensions?: {
+    /**
+     * Present on a `EXT_meshopt_compression` fallback buffer: a buffer
+     * kept for byte-length bookkeeping only, never actually read because
+     * every bufferView that nominally uses it is redirected by its own
+     * `EXT_meshopt_compression` extension to the real, compressed buffer.
+     */
+    EXT_meshopt_compression?: { fallback?: boolean };
+    [name: string]: unknown;
+  };
+};
+
+/** The `EXT_meshopt_compression` extension of a bufferView */
+export type GltfMeshoptCompression = {
+  /** buffer the compressed bytes live in (not the bufferView's own `buffer`) */
+  buffer: number;
+  byteOffset?: number;
+  /** length of the compressed bytes (not the decoded `byteLength` above) */
+  byteLength: number;
+  /** stride of one decoded element; together with `count` gives the decoded size */
+  byteStride: number;
+  count: number;
+  mode: 'ATTRIBUTES' | 'TRIANGLES' | 'INDICES';
+  filter?: 'NONE' | 'OCTAHEDRAL' | 'QUATERNION' | 'EXPONENTIAL';
 };
 
 export type GltfBufferView = {
@@ -86,7 +110,10 @@ export type GltfBufferView = {
   /** distance between the starts of two elements when attributes are interleaved */
   byteStride?: number;
   target?: number;
-  extensions?: Record<string, unknown>;
+  extensions?: {
+    EXT_meshopt_compression?: GltfMeshoptCompression;
+    [name: string]: unknown;
+  };
 };
 
 /** `5120` byte, `5121` unsigned byte, `5122` short, `5123` unsigned short, `5125` unsigned int, `5126` float */
@@ -125,6 +152,14 @@ export type GltfAccessor = {
 /** `0` points, `1` lines, `2` line loop, `3` line strip, `4` triangles, `5` triangle strip, `6` triangle fan */
 export type GltfPrimitiveMode = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
+/** The `KHR_draco_mesh_compression` extension of a primitive */
+export type GltfDracoMeshCompression = {
+  /** bufferView holding the Draco-encoded mesh */
+  bufferView: number;
+  /** attribute semantic to the attribute's unique id inside the Draco mesh */
+  attributes: Record<string, number>;
+};
+
 export type GltfPrimitive = {
   /** attribute semantic (`POSITION`, `NORMAL`, `TEXCOORD_0`, ...) to accessor index */
   attributes: Record<string, number>;
@@ -134,7 +169,10 @@ export type GltfPrimitive = {
   mode?: GltfPrimitiveMode;
   /** morph targets; read but not supported yet */
   targets?: Record<string, number>[];
-  extensions?: Record<string, unknown>;
+  extensions?: {
+    KHR_draco_mesh_compression?: GltfDracoMeshCompression;
+    [name: string]: unknown;
+  };
 };
 
 export type GltfMesh = {

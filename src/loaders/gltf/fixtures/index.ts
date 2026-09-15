@@ -4,8 +4,12 @@
  * take the document as JSON, as JSON with an external buffer, or as `.glb`.
  */
 import { GltfBuilder, toDataUri } from './builder';
+import type { DracoStubMesh } from './draco-stub';
+import type { GltfJson } from '../types';
 
 export { GltfBuilder, buildGlb, toDataUri, componentTypeOf } from './builder';
+export { createDracoStub } from './draco-stub';
+export type { DracoStubAttribute, DracoStubMesh } from './draco-stub';
 
 /** A right triangle in the XY plane, counter-clockwise */
 export const TRIANGLE_POSITIONS = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
@@ -354,4 +358,310 @@ export function camerasAndLights(): GltfBuilder {
     scenes: [{ nodes: [0, 1, 2, 3, 4, 5] }],
   });
   return builder;
+}
+
+/**
+ * `KHR_mesh_quantization`: normalized `Int16` positions and `Uint8` UVs.
+ * Quantization needs nothing beyond the typed attributes step (step 2);
+ * this fixture only pins down that the loader accepts the extension
+ * without warning and reads the quantized data correctly end to end.
+ */
+export function quantized(): GltfBuilder {
+  const builder = new GltfBuilder({
+    extensionsUsed: ['KHR_mesh_quantization'],
+  });
+  const position = builder.addData(
+    new Int16Array([0, 0, 0, 32767, 0, 0, 0, 32767, 0]),
+    'VEC3',
+    { normalized: true, min: [0, 0, 0], max: [32767, 32767, 0] }
+  );
+  const uv = builder.addData(new Uint8Array([0, 0, 255, 0, 0, 255]), 'VEC2', {
+    normalized: true,
+  });
+  const indices = builder.addData(new Uint16Array([0, 1, 2]), 'SCALAR');
+  builder.json.meshes = [
+    {
+      primitives: [
+        { attributes: { POSITION: position, TEXCOORD_0: uv }, indices },
+      ],
+    },
+  ];
+  builder.json.nodes = [{ mesh: 0 }];
+  builder.json.scenes = [{ nodes: [0] }];
+  return builder;
+}
+
+/**
+ * `EXT_meshopt_compression`: one triangle, shaped like the bufferViews
+ * `gltfpack -cc` produces (verified against real `gltfpack` output while
+ * building this fixture) - an ATTRIBUTES view each for position and
+ * normal, and a TRIANGLES view for the indices, every one redirected from
+ * a data-less "fallback" buffer to the real, compressed one. The
+ * "compressed" bytes here are just the decoded bytes themselves, so a
+ * stub decoder that copies its `source` into `target` unchanged
+ * reproduces the triangle; only the plumbing (which bufferView, which
+ * buffer, which arguments) is under test, not meshopt's actual bitstream.
+ * A NORMAL attribute keeps the loader from de-indexing the primitive
+ * (normal-less triangles get flat normals computed, which drops the
+ * index), so the decoded indices stay visible to assert on.
+ */
+export function meshoptCompressed(): GltfJson {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  const indices = new Uint16Array([0, 1, 2]);
+  const toBytes = (data: Float32Array | Uint16Array) =>
+    new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  const [positionBytes, normalBytes, indexBytes] = [
+    toBytes(positions),
+    toBytes(normals),
+    toBytes(indices),
+  ];
+  const compressed = new Uint8Array(
+    positionBytes.byteLength + normalBytes.byteLength + indexBytes.byteLength
+  );
+  compressed.set(positionBytes, 0);
+  compressed.set(normalBytes, positionBytes.byteLength);
+  compressed.set(indexBytes, positionBytes.byteLength + normalBytes.byteLength);
+  const normalOffset = positionBytes.byteLength;
+  const indexOffset = normalOffset + normalBytes.byteLength;
+  return {
+    asset: { version: '2.0' },
+    extensionsUsed: ['EXT_meshopt_compression'],
+    extensionsRequired: ['EXT_meshopt_compression'],
+    buffers: [
+      {
+        byteLength: compressed.byteLength,
+        uri: toDataUri(compressed, 'application/octet-stream'),
+      },
+      {
+        // a fallback buffer with no data of its own: every bufferView
+        // below is redirected to buffer 0 by its own extension
+        byteLength: compressed.byteLength,
+        extensions: { EXT_meshopt_compression: { fallback: true } },
+      },
+    ],
+    bufferViews: [
+      {
+        buffer: 1,
+        byteOffset: 0,
+        byteLength: positionBytes.byteLength,
+        byteStride: 12,
+        target: 34962,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: 0,
+            byteLength: positionBytes.byteLength,
+            byteStride: 12,
+            mode: 'ATTRIBUTES',
+            count: 3,
+          },
+        },
+      },
+      {
+        buffer: 1,
+        byteOffset: normalOffset,
+        byteLength: normalBytes.byteLength,
+        byteStride: 12,
+        target: 34962,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: normalOffset,
+            byteLength: normalBytes.byteLength,
+            byteStride: 12,
+            mode: 'ATTRIBUTES',
+            filter: 'OCTAHEDRAL',
+            count: 3,
+          },
+        },
+      },
+      {
+        buffer: 1,
+        byteOffset: indexOffset,
+        byteLength: indexBytes.byteLength,
+        target: 34963,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: indexOffset,
+            byteLength: indexBytes.byteLength,
+            byteStride: 2,
+            mode: 'TRIANGLES',
+            count: 3,
+          },
+        },
+      },
+    ],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: 'VEC3',
+        min: [0, 0, 0],
+        max: [1, 1, 0],
+      },
+      { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 2, componentType: 5123, count: 3, type: 'SCALAR' },
+    ],
+    meshes: [
+      {
+        primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2 }],
+      },
+    ],
+    nodes: [{ mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+}
+
+/**
+ * `KHR_draco_mesh_compression`: one triangle, shaped like real Draco
+ * output (verified against `gltfpack`'s Draco Box sample) - the accessors
+ * for `POSITION`/`NORMAL`/the indices carry shape (count, type) but no
+ * `bufferView`, and the primitive's `KHR_draco_mesh_compression`
+ * extension names the compressed bufferView and maps each semantic to its
+ * Draco attribute id (`1` for position, `0` for normal, matching the
+ * Khronos sample assets). The compressed bytes are a placeholder: the
+ * matching `stubMesh` tells {@link createDracoStub} what to "decode"
+ * regardless of bufferView content, so no real `.drc` bitstream is needed.
+ */
+export function dracoCompressed(): {
+  document: GltfJson;
+  stubMesh: DracoStubMesh;
+} {
+  const placeholder = new Uint8Array([0xda, 0xc0, 0x00]);
+  const document: GltfJson = {
+    asset: { version: '2.0' },
+    extensionsUsed: ['KHR_draco_mesh_compression'],
+    extensionsRequired: ['KHR_draco_mesh_compression'],
+    buffers: [
+      {
+        byteLength: placeholder.byteLength,
+        uri: toDataUri(placeholder, 'application/octet-stream'),
+      },
+    ],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: placeholder.byteLength },
+    ],
+    accessors: [
+      { componentType: 5123, count: 3, type: 'SCALAR' },
+      {
+        componentType: 5126,
+        count: 3,
+        type: 'VEC3',
+        min: [0, 0, 0],
+        max: [1, 1, 0],
+      },
+      { componentType: 5126, count: 3, type: 'VEC3' },
+    ],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 1, NORMAL: 2 },
+            indices: 0,
+            extensions: {
+              KHR_draco_mesh_compression: {
+                bufferView: 0,
+                attributes: { POSITION: 1, NORMAL: 0 },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    nodes: [{ mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+  const stubMesh: DracoStubMesh = {
+    numPoints: 3,
+    indices: [0, 1, 2],
+    attributes: {
+      1: {
+        values: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        componentType: 5126,
+        itemSize: 3,
+      },
+      0: {
+        values: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+        componentType: 5126,
+        itemSize: 3,
+      },
+    },
+  };
+  return { document, stubMesh };
+}
+
+/**
+ * `KHR_draco_mesh_compression` where the accessor `count` of a
+ * Draco-compressed attribute does not match the decoded mesh's own point
+ * count - a real quirk of some exporters (seen from Blender's glTF/Draco
+ * export path). `decodeDracoPrimitive()` must size its reads from the
+ * decoder's own `num_points()`, not the accessor.
+ */
+export function dracoCompressedPointCountMismatch(): {
+  document: GltfJson;
+  stubMesh: DracoStubMesh;
+} {
+  const { document, stubMesh } = dracoCompressed();
+  // the accessors claim 3 points; the stub mesh actually decodes to 4
+  stubMesh.numPoints = 4;
+  stubMesh.indices = [0, 1, 2, 1, 2, 3];
+  stubMesh.attributes[1] = {
+    values: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0],
+    componentType: 5126,
+    itemSize: 3,
+  };
+  stubMesh.attributes[0] = {
+    values: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+    componentType: 5126,
+    itemSize: 3,
+  };
+  return { document, stubMesh };
+}
+
+/**
+ * `KHR_draco_mesh_compression` with a `TANGENT` accessor that sits
+ * outside the extension's `attributes` map - a regular, uncompressed
+ * accessor alongside the Draco-compressed `POSITION`/`NORMAL`, which is
+ * what Blender's glTF exporter produces. `matchingCount: false` gives the
+ * `TANGENT` accessor a different `count` than the Draco-decoded points,
+ * another real quirk of the same exporter, which the loader must drop
+ * (with a warning) rather than read out of bounds.
+ */
+export function dracoCompressedWithTangent(
+  options: { matchingCount?: boolean } = {}
+): { document: GltfJson; stubMesh: DracoStubMesh } {
+  const { document, stubMesh } = dracoCompressed();
+  const tangentCount = options.matchingCount === false ? 2 : 3;
+  const tangents = new Float32Array(
+    Array.from({ length: tangentCount }, () => [1, 0, 0, 1]).flat()
+  );
+  const tangentBytes = new Uint8Array(
+    tangents.buffer,
+    tangents.byteOffset,
+    tangents.byteLength
+  );
+  // a second buffer, so this stays independent of the placeholder Draco
+  // bytes in buffer 0
+  document.buffers!.push({
+    byteLength: tangentBytes.byteLength,
+    uri: toDataUri(tangentBytes, 'application/octet-stream'),
+  });
+  const bufferView = document.bufferViews!.push({
+    buffer: 1,
+    byteOffset: 0,
+    byteLength: tangentBytes.byteLength,
+  });
+  const accessor = document.accessors!.push({
+    bufferView: bufferView - 1,
+    componentType: 5126,
+    count: tangentCount,
+    type: 'VEC4',
+  });
+  document.meshes![0].primitives[0].attributes.TANGENT = accessor - 1;
+  return { document, stubMesh };
 }

@@ -17,7 +17,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - lights as scene graph nodes (`AmbientLight`, `DirectionalLight`, `PointLight`), passed to shaders as built-in uniforms in view space
 - a physically based material (`createPbrMaterial`): the glTF metallic-roughness model with base colour, metallic-roughness, normal, occlusion and emissive maps, alpha modes and an unlit variant
-- a glTF 2.0 loader (`loadGltf`, `parseGltf`) for `.gltf` and `.glb` files: nodes, meshes, PBR materials, textures, cameras and `KHR_lights_punctual` lights (static models; animations and skinning are not supported yet)
+- a glTF 2.0 loader (`loadGltf`, `parseGltf`) for `.gltf` and `.glb` files: nodes, meshes, PBR materials, textures, cameras, `KHR_lights_punctual` lights, and quantized, meshopt- and Draco-compressed meshes (static models; animations and skinning are not supported yet)
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
@@ -261,7 +261,12 @@ model.json; // the parsed document, for anything not mapped
 `parseGltf(data, options)` does the same for data already in memory: the bytes of a `.glb`, the
 text or bytes of a `.gltf`, or its parsed JSON. Both take options: `baseUrl` (what relative URIs
 resolve against), `fetch` (defaults to the global one; pass your own to load from memory or to
-add headers) and `loadImage` (how images are decoded; defaults to `createImageBitmap`).
+add headers), `loadImage` (how images are decoded; defaults to `createImageBitmap`), `meshopt`
+(a decoder for `EXT_meshopt_compression`, exactly the shape of `MeshoptDecoder` from the
+`meshoptimizer` package) and `draco` (a decoder module for `KHR_draco_mesh_compression`, the
+result of `createDecoderModule()` from `draco3d`, or the CDN build's `DracoDecoderModule`).
+Neither decoder is bundled by magic-pixels; a file that uses one of these extensions without the
+matching option throws, naming it.
 
 ```js
 const model = await parseGltf(arrayBuffer, {
@@ -270,11 +275,13 @@ const model = await parseGltf(arrayBuffer, {
 ```
 
 Supported: `.gltf` with external, data URI or embedded buffers and images, `.glb`, interleaved
-and sparse accessors, quantized attributes (`KHR_mesh_quantization`), every metallic-roughness
-material property and alpha mode, `KHR_materials_unlit`, `KHR_materials_emissive_strength`,
-`KHR_lights_punctual` (spot lights load as point lights). Primitives without normals get flat
-ones. A file that requires an unsupported extension throws; an optional unsupported extension,
-animations, skins and morph targets are skipped with a `console.warn`.
+and sparse accessors, quantized attributes (`KHR_mesh_quantization`), meshopt- and
+Draco-compressed meshes (`EXT_meshopt_compression`, `KHR_draco_mesh_compression`), every
+metallic-roughness material property and alpha mode, `KHR_materials_unlit`,
+`KHR_materials_emissive_strength`, `KHR_lights_punctual` (spot lights load as point lights).
+Primitives without normals get flat ones. A file that requires an unsupported extension throws;
+an optional unsupported extension, animations, skins and morph targets are skipped with a
+`console.warn`.
 
 ### Writing shaders
 

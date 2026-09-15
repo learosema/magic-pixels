@@ -210,12 +210,16 @@ render as its author saw it.
 A file lists the extensions it uses in `extensionsUsed` and the subset it
 cannot be rendered without in `extensionsRequired`. The loader supports
 `KHR_lights_punctual`, `KHR_materials_unlit`,
-`KHR_materials_emissive_strength` and `KHR_mesh_quantization` (which is
-free, see [typed attributes](./typed-attributes.md)). A required
-extension outside that list is an error before any data is read; an
-unsupported optional one, `KHR_texture_transform` for instance, is a
-`console.warn` and the file loads without it. Animations, skins and morph
-targets are read past with a warning; they are the next milestone.
+`KHR_materials_emissive_strength`, `KHR_mesh_quantization` (which is free,
+see [typed attributes](./typed-attributes.md)), and the two mesh
+compression extensions covered in [Compression](./compression.md),
+`EXT_meshopt_compression` and `KHR_draco_mesh_compression` (both need a
+decoder passed in as an option; a file that uses one without the matching
+option throws naming it). A required extension outside that list is an
+error before any data is read; an unsupported optional one,
+`KHR_texture_transform` for instance, is a `console.warn` and the file
+loads without it. Animations, skins and morph targets are read past with
+a warning; they are the next milestone.
 
 ## In magic-pixels
 
