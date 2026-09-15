@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>glTF loader &mdash; magic-pixels example</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .controls {
+        pointer-events: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+      }
+      .controls select {
+        font: inherit;
+        padding: 0.25rem 0.5rem;
+        background: #1c1f28;
+        color: inherit;
+        border: 1px solid #2a2d38;
+        border-radius: 0.25rem;
+      }
+      #status {
+        font-size: 0.85rem;
+        opacity: 0.8;
+        margin-top: 0.5rem;
+      }
+      body.dragging::after {
+        content: 'Drop a .glb, or a .gltf with its .bin and images';
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(17, 19, 24, 0.7);
+        border: 2px dashed #9ecbff;
+        font-size: 1.25rem;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div class="overlay">
+      <div>
+        <h1>glTF loader</h1>
+        <p>
+          <code>loadGltf(url)</code> fetches a Khronos sample model and turns it
+          into a scene: nodes, meshes, PBR materials, textures, cameras and
+          lights, framed from its <code>computeBoundingSphere()</code>. Drag to
+          turn it. Drop your own <code>.glb</code> (or a
+          <code>.gltf</code> together with its <code>.bin</code> and images)
+          anywhere on the page to load it from memory through the
+          <code>fetch</code> option.
+        </p>
+        <div class="controls">
+          <label
+            >Model
+            <select id="model"></select
+          ></label>
+          <label
+            ><input type="checkbox" id="lights" checked /> demo lights</label
+          >
+        </div>
+        <div id="status">Loading&hellip;</div>
+      </div>
+      <a href="../">&larr; all examples</a>
+    </div>
+    <script type="module">
+      import {
+        WebGL2Renderer,
+        Scene,
+        Object3D,
+        Mesh,
+        PerspectiveCamera,
+        AmbientLight,
+        DirectionalLight,
+        Vector,
+        Stopwatch,
+        loadGltf,
+        computeBoundingSphere,
+      } from '../magic-pixels.js';
+
+      // ---------------------------------------------------------- models
+
+      const SAMPLES =
+        'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
+      const MODELS = [
+        ['Box', 'Box/glTF-Binary/Box.glb'],
+        ['BoxTextured', 'BoxTextured/glTF-Binary/BoxTextured.glb'],
+        ['BoxVertexColors', 'BoxVertexColors/glTF-Binary/BoxVertexColors.glb'],
+        ['BoxInterleaved', 'BoxInterleaved/glTF-Binary/BoxInterleaved.glb'],
+        ['Duck', 'Duck/glTF-Binary/Duck.glb'],
+        ['Suzanne (.gltf + .bin)', 'Suzanne/glTF/Suzanne.gltf'],
+        ['Lantern', 'Lantern/glTF-Binary/Lantern.glb'],
+        ['DamagedHelmet', 'DamagedHelmet/glTF-Binary/DamagedHelmet.glb'],
+        ['AntiqueCamera', 'AntiqueCamera/glTF-Binary/AntiqueCamera.glb'],
+        [
+          'NormalTangentMirrorTest',
+          'NormalTangentMirrorTest/glTF-Binary/NormalTangentMirrorTest.glb',
+        ],
+        [
+          'AlphaBlendModeTest',
+          'AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb',
+        ],
+        ['OrientationTest', 'OrientationTest/glTF-Binary/OrientationTest.glb'],
+        ['Sponza (large, many files)', 'Sponza/glTF/Sponza.gltf'],
+      ];
+
+      const select = document.getElementById('model');
+      for (const [name, path] of MODELS) {
+        const option = document.createElement('option');
+        option.textContent = name;
+        option.value = SAMPLES + path;
+        select.append(option);
+      }
+      // `?model=Duck` preselects a model by its folder name
+      const requested = new URLSearchParams(location.search).get('model');
+      const preset =
+        MODELS.find(([, path]) => path.split('/')[0] === requested) ??
+        MODELS[7];
+      select.value = SAMPLES + preset[1];
+
+      // ----------------------------------------------------------- scene
+
+      const canvas = document.getElementById('canvas');
+      const renderer = new WebGL2Renderer(canvas);
+      renderer.setClearColor('#0b0d12');
+
+      const scene = new Scene();
+
+      // The loaded model hangs off a pivot that the mouse turns. A file's
+      // own `Scene` is an `Object3D`, so it can be a child like anything else.
+      const pivot = new Object3D();
+      scene.add(pivot);
+
+      const camera = new PerspectiveCamera(40, 1, 0.1, 100);
+      scene.add(camera);
+
+      // A headlight parented to the camera plus a fill from above; a file
+      // that brings its own KHR_lights_punctual lights adds to these.
+      const demoLights = new Object3D();
+      demoLights.add(new AmbientLight('#ffffff', 0.15));
+      const fill = new DirectionalLight('#dfe8ff', 0.4);
+      fill.position.set(-3, 5, 2);
+      fill.lookAt(new Vector(0, 0, 0));
+      demoLights.add(fill);
+      scene.add(demoLights);
+      const headlight = new DirectionalLight('#fff4e6', 0.9);
+      camera.add(headlight);
+      document.getElementById('lights').addEventListener('change', (e) => {
+        demoLights.visible = headlight.visible = e.target.checked;
+      });
+
+      // --------------------------------------------------------- framing
+
+      // Centre the model under the pivot and back the camera off so that
+      // its bounding sphere fits the vertical field of view: a sphere of
+      // radius r fills a field of view fov from a distance of
+      // r / sin(fov / 2). The loader filled every geometry's bounding box
+      // from the file, so this costs one pass over the vertices for the
+      // sphere radii and a few matrix multiplications per mesh.
+      function frame(model) {
+        const sphere = computeBoundingSphere(model);
+        if (sphere.isEmpty) sphere.set(new Vector(0, 0, 0), 1);
+        const { center, radius } = sphere;
+        model.position.set(-center.x, -center.y, -center.z);
+        const halfFov = (camera.fov / 2) * (Math.PI / 180);
+        const distance = (radius / Math.sin(halfFov)) * 1.1;
+        camera.position.set(0, radius * 0.25, distance);
+        camera.near = distance / 100;
+        camera.far = distance + radius * 4;
+        camera.updateProjectionMatrix();
+        camera.lookAt(new Vector(0, 0, 0));
+      }
+
+      // --------------------------------------------------------- loading
+
+      const status = document.getElementById('status');
+      let current = null;
+
+      function describe(name, result) {
+        let meshes = 0;
+        let vertices = 0;
+        let triangles = 0;
+        result.scene.traverse((object) => {
+          if (!(object instanceof Mesh)) return;
+          meshes++;
+          const { geometry } = object;
+          vertices += geometry.attributes.position?.count ?? 0;
+          if (object.material.drawMode === 'triangles') {
+            triangles += geometry.count / 3;
+          }
+        });
+        const plural = (n, word) =>
+          `${n} ${n === 1 ? word : word + (word.endsWith('sh') ? 'es' : 's')}`;
+        const parts = [
+          plural(meshes, 'mesh'),
+          `${vertices.toLocaleString()} vertices`,
+          `${Math.round(triangles).toLocaleString()} triangles`,
+          plural(result.materials.length, 'material'),
+          plural(result.textures.length, 'texture'),
+          plural(result.cameras.length, 'camera'),
+          plural(result.lights.length, 'light'),
+        ];
+        return `${name}: ${parts.join(', ')}`;
+      }
+
+      // GPU resources belong to the renderer; free the previous model's
+      // before swapping it out.
+      function unload() {
+        if (!current) return;
+        current.scene.traverse((object) => {
+          if (object instanceof Mesh) {
+            renderer.dispose(object.geometry);
+            renderer.dispose(object.material);
+          }
+        });
+        for (const texture of current.textures) renderer.dispose(texture);
+        pivot.remove(current.scene);
+        current = null;
+      }
+
+      let loading = 0;
+      async function show(name, load) {
+        const token = ++loading;
+        status.textContent = `Loading ${name}…`;
+        try {
+          const result = await load();
+          if (token !== loading) return; // superseded by a newer request
+          unload();
+          current = result;
+          // measure the model while it is still a root, so its own space
+          // is world space, then hang it off the (reset) pivot
+          frame(result.scene);
+          pivot.rotation.set(0, 0, 0);
+          pivot.add(result.scene);
+          status.textContent = describe(name, result);
+        } catch (error) {
+          status.textContent = `${name}: ${error.message}`;
+          console.error(error);
+        }
+      }
+
+      function showSample() {
+        const url = select.value;
+        const name = select.selectedOptions[0].textContent;
+        show(name, () => loadGltf(url));
+      }
+      select.addEventListener('change', showSample);
+      showSample();
+
+      // Dropped files never touch the network: a `fetch` that answers from
+      // the dropped `File`s by name serves the .gltf, its buffers and its
+      // images alike (the loader's default image decoder goes through it).
+      function showDropped(files) {
+        const byName = new Map(files.map((file) => [file.name, file]));
+        const main = files.find((file) => /\.(gltf|glb)$/i.test(file.name));
+        if (!main) {
+          status.textContent = 'Drop a .glb or .gltf file';
+          return;
+        }
+        const fetch = async (url) => {
+          const name = decodeURIComponent(String(url).split('/').pop());
+          const file = byName.get(name);
+          return file
+            ? new Response(file)
+            : new Response(null, { status: 404, statusText: 'not dropped' });
+        };
+        show(main.name, () => loadGltf(main.name, { fetch }));
+      }
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        document.body.classList.add('dragging');
+      });
+      document.addEventListener('dragleave', () => {
+        document.body.classList.remove('dragging');
+      });
+      document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        document.body.classList.remove('dragging');
+        showDropped([...e.dataTransfer.files]);
+      });
+
+      // ----------------------------------------------------- interaction
+
+      let dragging = null;
+      let spin = true;
+      canvas.addEventListener('pointerdown', (e) => {
+        dragging = { x: e.clientX, y: e.clientY };
+        spin = false;
+        canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        pivot.rotation.y += (e.clientX - dragging.x) * 0.01;
+        pivot.rotation.x += (e.clientY - dragging.y) * 0.01;
+        dragging = { x: e.clientX, y: e.clientY };
+      });
+      canvas.addEventListener('pointerup', () => (dragging = null));
+
+      function resize() {
+        const { innerWidth: width, innerHeight: height } = window;
+        renderer
+          .setPixelRatio(Math.min(devicePixelRatio, 2))
+          .setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      const clock = new Stopwatch().start();
+      let last = 0;
+      function tick() {
+        const t = clock.elapsedTime / 1000;
+        if (spin) pivot.rotation.y += (t - last) * 0.3;
+        last = t;
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

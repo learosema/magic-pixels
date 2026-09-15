@@ -30,6 +30,7 @@ import type {
   Uniforms,
 } from './material';
 import { prepareScene } from './renderer';
+import { computeBoundingBox, computeBoundingSphere } from './bounds';
 import type { Frame, Renderer } from './renderer';
 import { NullRenderer } from './null-renderer';
 import type { NullFrame } from './null-renderer';
@@ -62,6 +63,8 @@ export {
   PointLight,
   NullRenderer,
   prepareScene,
+  computeBoundingBox,
+  computeBoundingSphere,
   Filter,
   Wrapping,
   DrawMode,

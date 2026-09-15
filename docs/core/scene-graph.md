@@ -26,6 +26,8 @@ composes: move the parent and every descendant moves with it.
   moves it. `add()` refuses to create a cycle.
 - `visible`: an invisible object and its whole subtree are skipped by
   `prepareScene()`.
+- `name`: a free label, empty by default. The glTF loader fills it with
+  the node name from the file, so `traverse()` can find "Wheel_FL" again.
 
 ## The tree walk
 

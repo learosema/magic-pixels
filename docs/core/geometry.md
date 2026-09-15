@@ -80,6 +80,19 @@ corners via a cross product, for geometry you build yourself.
 `mergeGeometries()` concatenates geometries with the same attributes into
 one, which turns many draw calls into one.
 
+## Bounding volumes
+
+`geometry.computeBoundingBox()` and `computeBoundingSphere()` measure the
+`position` attribute in the geometry's own space and cache the result in
+`boundingBox` ({@link Box3}) and `boundingSphere` ({@link Sphere}); set
+either to `null` after editing positions so it is recomputed. Normalized
+integer positions are read through `BufferAttribute.getComponent()`,
+which applies the same `0..1` / `-1..1` mapping the GPU does. For the
+world-space extent of a mesh or a whole subtree, use
+{@link computeBoundingBox} / {@link computeBoundingSphere} from the scene
+module; the [Bounding volumes](../gltf/bounding-volumes.md) page explains
+both shapes and what they are for.
+
 ## Changing a geometry
 
 Two kinds of change, two mechanisms:

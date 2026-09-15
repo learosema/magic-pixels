@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="320" viewBox="0 0 700 320" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="12">
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="699" height="319" rx="6" fill="#fff" stroke="#bbb"/>
+  <line x1="350" y1="20" x2="350" y2="300" stroke="#ddd"/>
+
+  <!-- left panel: box, loose sphere, tight sphere -->
+  <text x="24" y="30" fill="#333" font-weight="600">Box and sphere of one geometry</text>
+  <!-- loose sphere: half diagonal of the 180 x 120 box = 108 -->
+  <circle cx="175" cy="150" r="108" fill="none" stroke="#d9822b" stroke-width="1.5" stroke-dasharray="2 3"/>
+  <!-- tight sphere: farthest vertex from the box centre = 90 -->
+  <circle cx="175" cy="150" r="90" fill="none" stroke="#d9822b" stroke-width="1.5"/>
+  <!-- the geometry: an ellipse 180 x 120 -->
+  <ellipse cx="175" cy="150" rx="90" ry="60" fill="#dbe8fb" stroke="#3b7dd8"/>
+  <!-- box -->
+  <rect x="85" y="90" width="180" height="120" fill="none" stroke="#333" stroke-dasharray="5 3"/>
+  <circle cx="175" cy="150" r="2.5" fill="#333"/>
+  <!-- radius of the tight sphere -->
+  <line x1="175" y1="150" x2="265" y2="150" stroke="#d9822b"/>
+  <text x="220" y="164" text-anchor="middle" fill="#d9822b" font-size="11">farthest vertex</text>
+  <!-- radius of the loose sphere -->
+  <line x1="175" y1="150" x2="265" y2="90" stroke="#d9822b" stroke-dasharray="2 3"/>
+  <text x="200" y="108" text-anchor="middle" fill="#d9822b" font-size="11">half diagonal</text>
+  <g font-size="11">
+    <text x="24" y="277" fill="#333">dashed box: axis-aligned bounding box (min, max)</text>
+    <text x="24" y="292" fill="#d9822b">dotted circle: sphere around the box (half its diagonal)</text>
+    <text x="24" y="307" fill="#d9822b">solid circle: same centre, radius of the farthest vertex</text>
+  </g>
+
+  <!-- right panel: a rotated box refitted -->
+  <text x="374" y="30" fill="#333" font-weight="600">A rotated box is refitted around its corners</text>
+  <!-- the original box (before rotation), faint -->
+  <rect x="465" y="140" width="120" height="60" fill="none" stroke="#bbb" stroke-dasharray="5 3"/>
+  <!-- the rotated geometry box: 120 x 60 rotated 30° about (525, 170) -->
+  <rect x="465" y="140" width="120" height="60" fill="#dbe8fb" stroke="#3b7dd8" transform="rotate(30 525 170)"/>
+  <!-- corners after rotation, half extents (60, 30): (±66.96, ±55.98) -->
+  <g fill="#3b7dd8">
+    <circle cx="561.96" cy="225.98" r="2.5"/>
+    <circle cx="591.96" cy="174.02" r="2.5"/>
+    <circle cx="458.04" cy="165.98" r="2.5"/>
+    <circle cx="488.04" cy="114.02" r="2.5"/>
+  </g>
+  <!-- the refitted axis-aligned box -->
+  <rect x="458.04" y="114.02" width="133.92" height="111.96" fill="none" stroke="#333" stroke-dasharray="5 3"/>
+  <g font-size="11">
+    <text x="525" y="256" text-anchor="middle" fill="#333">120 × 60 → 134 × 112 after 30°</text>
+    <text x="374" y="292" fill="#999">grey: box before the rotation</text>
+    <text x="374" y="307" fill="#333">dashed: axis-aligned box around the rotated corners</text>
+  </g>
+</svg>
