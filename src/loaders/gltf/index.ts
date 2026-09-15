@@ -3,6 +3,10 @@ import type { GltfLoaderOptions, GltfResult } from './loader';
 import { parseGlb, isGlb } from './glb';
 import type { Glb } from './glb';
 import { readAccessor, readAccessorData, readIndices } from './accessors';
+import { decodeDracoPrimitive } from './draco';
+import type { DracoDecoderModule } from './draco';
+import { decodeMeshoptBufferViews } from './meshopt';
+import type { MeshoptDecoder } from './meshopt';
 import type {
   GltfAccessor,
   GltfAccessorType,
@@ -12,11 +16,13 @@ import type {
   GltfBufferView,
   GltfCamera,
   GltfComponentType,
+  GltfDracoMeshCompression,
   GltfImage,
   GltfJson,
   GltfLight,
   GltfMaterial,
   GltfMesh,
+  GltfMeshoptCompression,
   GltfNode,
   GltfNormalTextureInfo,
   GltfOcclusionTextureInfo,
@@ -36,6 +42,8 @@ export type {
   GltfLoaderOptions,
   GltfResult,
   Glb,
+  DracoDecoderModule,
+  MeshoptDecoder,
   GltfAccessor,
   GltfAccessorType,
   GltfAlphaMode,
@@ -44,11 +52,13 @@ export type {
   GltfBufferView,
   GltfCamera,
   GltfComponentType,
+  GltfDracoMeshCompression,
   GltfImage,
   GltfJson,
   GltfLight,
   GltfMaterial,
   GltfMesh,
+  GltfMeshoptCompression,
   GltfNode,
   GltfNormalTextureInfo,
   GltfOcclusionTextureInfo,
@@ -71,5 +81,7 @@ export {
   readAccessor,
   readAccessorData,
   readIndices,
+  decodeDracoPrimitive,
+  decodeMeshoptBufferViews,
   SUPPORTED_EXTENSIONS,
 };

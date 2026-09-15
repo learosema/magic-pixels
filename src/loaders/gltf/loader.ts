@@ -28,7 +28,11 @@ import type {
 } from '../../scene';
 import { getBufferView, readAccessor, readIndices } from './accessors';
 import type { GltfBuffers } from './accessors';
+import { decodeDracoPrimitive } from './draco';
+import type { DracoDecoderModule } from './draco';
 import { isGlb, parseGlb } from './glb';
+import { decodeMeshoptBufferViews } from './meshopt';
+import type { MeshoptDecoder } from './meshopt';
 import type {
   GltfJson,
   GltfMesh,
@@ -57,6 +61,19 @@ export type GltfLoaderOptions = {
    * `createImageBitmap`; tests inject a stub so Node needs no DOM.
    */
   loadImage?: (source: Blob | string) => Promise<TextureData>;
+  /**
+   * Decoder for `EXT_meshopt_compression`, exactly the shape of
+   * `MeshoptDecoder` from the `meshoptimizer` package. Required only if
+   * the file uses the extension; magic-pixels never bundles a decoder.
+   */
+  meshopt?: MeshoptDecoder;
+  /**
+   * Decoder module for `KHR_draco_mesh_compression`: the result of
+   * `createDecoderModule()` from `draco3d`, or the `DracoDecoderModule`
+   * global of the CDN build. Required only if the file uses the
+   * extension; magic-pixels never bundles a decoder.
+   */
+  draco?: DracoDecoderModule;
 };
 
 /** What {@link loadGltf} and {@link parseGltf} return */
@@ -85,6 +102,8 @@ export type GltfResult = {
 
 /** Extensions the loader understands; others are warned about or rejected */
 export const SUPPORTED_EXTENSIONS = [
+  'EXT_meshopt_compression',
+  'KHR_draco_mesh_compression',
   'KHR_lights_punctual',
   'KHR_materials_emissive_strength',
   'KHR_materials_unlit',
@@ -266,7 +285,11 @@ class GltfParser {
   private readonly fetch: typeof globalThis.fetch | null;
   private readonly loadImage: (source: Blob | string) => Promise<TextureData>;
   private readonly baseUrl: string | undefined;
+  private readonly meshopt: MeshoptDecoder | undefined;
+  private readonly draco: DracoDecoderModule | undefined;
 
+  /** the document exactly as given, returned to the caller as `result.json` */
+  private readonly originalJson: GltfJson;
   private buffers: GltfBuffers = [];
   private readonly materials = new Map<string, Promise<Material>>();
   private readonly textures = new Map<string, Promise<Texture>>();
@@ -276,10 +299,11 @@ class GltfParser {
   private readonly warnings = new Set<string>();
 
   constructor(
-    private readonly json: GltfJson,
+    private json: GltfJson,
     private readonly bin: Uint8Array | null,
     options: GltfLoaderOptions
   ) {
+    this.originalJson = json;
     this.baseUrl = options.baseUrl;
     this.fetch =
       options.fetch ??
@@ -287,13 +311,25 @@ class GltfParser {
         ? globalThis.fetch.bind(globalThis)
         : null);
     this.loadImage = options.loadImage ?? this.defaultLoadImage.bind(this);
+    this.meshopt = options.meshopt;
+    this.draco = options.draco;
   }
 
   async parse(): Promise<GltfResult> {
-    const { json } = this;
     this.checkAsset();
     this.checkExtensions();
-    this.buffers = await this.loadBuffers();
+    const rawBuffers = await this.loadBuffers();
+    // EXT_meshopt_compression bufferViews are decoded once, up front, into
+    // a patched document so every accessor and image read below sees
+    // plain bytes and never has to know compression happened
+    const decoded = await decodeMeshoptBufferViews(
+      this.json,
+      rawBuffers,
+      this.meshopt
+    );
+    this.json = decoded.json;
+    this.buffers = decoded.buffers;
+    const { json } = this;
 
     // geometries first, and every material they need in parallel
     const meshes = await Promise.all(
@@ -319,7 +355,7 @@ class GltfParser {
       lights: this.lights,
       materials: await Promise.all(this.materials.values()),
       textures: await Promise.all(this.textures.values()),
-      json,
+      json: this.originalJson,
     };
   }
 
@@ -375,6 +411,11 @@ class GltfParser {
     return Promise.all(
       (this.json.buffers ?? []).map(async (buffer, index) => {
         if (buffer.uri === undefined) {
+          if (buffer.extensions?.EXT_meshopt_compression?.fallback) {
+            // a stub kept only for byte-length bookkeeping: every
+            // bufferView that nominally uses it is redirected elsewhere
+            return new Uint8Array(0);
+          }
           if (!this.bin) {
             throw Error(
               `glTF: buffer ${index} has no uri and there is no GLB binary chunk`
@@ -575,16 +616,67 @@ class GltfParser {
       );
     }
     const geometry = new BufferGeometry();
-    for (const [semantic, accessor] of Object.entries(primitive.attributes)) {
-      const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
-      geometry.setAttribute(
-        name,
-        readAccessor(this.json, accessor, this.buffers)
+    const dracoExt = primitive.extensions?.KHR_draco_mesh_compression;
+    if (dracoExt) {
+      if (!this.draco) {
+        throw Error(
+          'glTF: the file uses KHR_draco_mesh_compression; pass options.draco'
+        );
+      }
+      const decoded = decodeDracoPrimitive(
+        this.json,
+        primitive,
+        dracoExt,
+        this.buffers,
+        this.draco
       );
-    }
-    if (primitive.indices !== undefined) {
-      const indices = readIndices(this.json, primitive.indices, this.buffers);
-      geometry.setIndex(indices, indices instanceof Uint32Array ? 32 : 16);
+      for (const [semantic, attribute] of Object.entries(decoded.attributes)) {
+        const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
+        geometry.setAttribute(name, attribute);
+      }
+      // an attribute the extension does not list is a regular accessor
+      // sitting alongside the compressed ones: exporters (Blender's glTF
+      // Draco path among them) sometimes leave TANGENT uncompressed. Its
+      // declared count is meant to match the Draco-decoded point count
+      // (geometry.attributes.position, set above); the same exporters
+      // sometimes get that wrong too, and a mismatched attribute would
+      // read out of bounds once indexed, so it is dropped with a warning
+      // instead - the PBR shader derives tangents on its own when absent.
+      const dracoPointCount = geometry.attributes.position?.count;
+      for (const [semantic, accessor] of Object.entries(primitive.attributes)) {
+        if (semantic in dracoExt.attributes) {
+          continue;
+        }
+        const attribute = readAccessor(this.json, accessor, this.buffers);
+        if (
+          dracoPointCount !== undefined &&
+          attribute.count !== dracoPointCount
+        ) {
+          this.warn(
+            `mesh "${mesh.name ?? ''}" has a ${semantic} accessor with ${attribute.count} elements, ` +
+              `but its Draco-compressed attributes decoded to ${dracoPointCount}; ${semantic} is dropped`
+          );
+          continue;
+        }
+        const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
+        geometry.setAttribute(name, attribute);
+      }
+      geometry.setIndex(
+        decoded.indices,
+        decoded.indices instanceof Uint32Array ? 32 : 16
+      );
+    } else {
+      for (const [semantic, accessor] of Object.entries(primitive.attributes)) {
+        const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
+        geometry.setAttribute(
+          name,
+          readAccessor(this.json, accessor, this.buffers)
+        );
+      }
+      if (primitive.indices !== undefined) {
+        const indices = readIndices(this.json, primitive.indices, this.buffers);
+        geometry.setIndex(indices, indices instanceof Uint32Array ? 32 : 16);
+      }
     }
     if (!geometry.attributes.position) {
       this.warn(`mesh "${mesh.name ?? ''}" has a primitive without POSITION`);

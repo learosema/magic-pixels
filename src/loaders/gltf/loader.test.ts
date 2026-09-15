@@ -29,12 +29,19 @@ import {
   GltfBuilder,
   TRIANGLE_POSITIONS,
   camerasAndLights,
+  createDracoStub,
+  dracoCompressed,
+  dracoCompressedPointCountMismatch,
+  dracoCompressedWithTangent,
   interleaved,
   materials,
+  meshoptCompressed,
   nodeTree,
   quadWithoutNormals,
+  quantized,
   triangle,
 } from './fixtures';
+import type { MeshoptDecoder } from './meshopt';
 
 function fakeImage(): TextureData {
   return { width: 1, height: 1, data: new Uint8ClampedArray(4) } as ImageData;
@@ -144,9 +151,9 @@ describe('parseGltf', () => {
     await expect(
       parseGltf({
         asset: { version: '2.0' },
-        extensionsRequired: ['KHR_draco_mesh_compression'],
+        extensionsRequired: ['KHR_texture_transform'],
       })
-    ).rejects.toThrow(/KHR_draco_mesh_compression/);
+    ).rejects.toThrow(/KHR_texture_transform/);
   });
 
   test('warns about unsupported optional extensions, animations and skins', async () => {
@@ -607,5 +614,147 @@ describe('bounding boxes', () => {
     const { geometry } = scene.children[0] as Mesh;
     expect(geometry.boundingBox).toBeNull();
     expect(geometry.computeBoundingBox().max.toArray()).toEqual([1, 1, 0]);
+  });
+});
+
+describe('compression', () => {
+  test('KHR_mesh_quantization needs nothing beyond typed attributes', async () => {
+    const result = await parseGltf(quantized().toJson());
+    const { geometry } = result.scene.children[0] as Mesh;
+    const { position, uv } = geometry.attributes;
+    expect(position.data).toBeInstanceOf(Int16Array);
+    expect(position.normalized).toBe(true);
+    expect(Array.from(position.data)).toEqual([
+      0, 0, 0, 32767, 0, 0, 0, 32767, 0,
+    ]);
+    // WebGL maps the stored Int16 to -1..1
+    expect(position.getComponent(1, 0)).toBeCloseTo(1);
+    expect(uv.data).toBeInstanceOf(Uint8Array);
+    expect(Array.from(uv.data)).toEqual([0, 0, 255, 0, 0, 255]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  function meshoptStub() {
+    const calls: {
+      count: number;
+      size: number;
+      source: Uint8Array;
+      mode: string;
+      filter?: string;
+    }[] = [];
+    const decoder: MeshoptDecoder = {
+      ready: Promise.resolve(),
+      decodeGltfBuffer(target, count, size, source, mode, filter) {
+        calls.push({ count, size, source: source.slice(), mode, filter });
+        target.set(source.subarray(0, target.byteLength));
+      },
+    };
+    return { decoder, calls };
+  }
+
+  test('EXT_meshopt_compression decodes every compressed bufferView once', async () => {
+    const { decoder, calls } = meshoptStub();
+    const document = meshoptCompressed();
+    const result = await parseGltf(document, { meshopt: decoder });
+    const { geometry } = result.scene.children[0] as Mesh;
+    expect(Array.from(geometry.attributes.position.data)).toEqual([
+      0, 0, 0, 1, 0, 0, 0, 1, 0,
+    ]);
+    expect(Array.from(geometry.attributes.normal.data)).toEqual([
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+    ]);
+    expect(geometry.index).toBeInstanceOf(Uint16Array);
+    expect(Array.from(geometry.index!)).toEqual([0, 1, 2]);
+
+    expect(calls).toHaveLength(3);
+    expect(calls[0]).toMatchObject({ mode: 'ATTRIBUTES', count: 3, size: 12 });
+    expect(calls[1]).toMatchObject({
+      mode: 'ATTRIBUTES',
+      count: 3,
+      size: 12,
+      filter: 'OCTAHEDRAL',
+    });
+    expect(calls[2]).toMatchObject({ mode: 'TRIANGLES', count: 3, size: 2 });
+
+    // the returned json is the original, compressed document, untouched
+    expect(result.json).toBe(document);
+    expect(
+      result.json.bufferViews![0].extensions?.EXT_meshopt_compression
+    ).toBeDefined();
+  });
+
+  test('a required EXT_meshopt_compression without a decoder names the option', async () => {
+    await expect(parseGltf(meshoptCompressed())).rejects.toThrow(
+      /options\.meshopt/
+    );
+  });
+
+  test('KHR_draco_mesh_compression decodes attributes and indices, and frees every object', async () => {
+    const { document, stubMesh } = dracoCompressed();
+    const { module, calls } = createDracoStub(stubMesh);
+    const result = await parseGltf(document, { draco: module });
+    const { geometry } = result.scene.children[0] as Mesh;
+
+    expect(Array.from(geometry.attributes.position.data)).toEqual([
+      0, 0, 0, 1, 0, 0, 0, 1, 0,
+    ]);
+    expect(Array.from(geometry.attributes.normal.data)).toEqual([
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+    ]);
+    expect(geometry.index).toBeInstanceOf(Uint16Array);
+    expect(Array.from(geometry.index!)).toEqual([0, 1, 2]);
+    expect(geometry.boundingBox!.max.toArray()).toEqual([1, 1, 0]);
+
+    // attributes were looked up by the extension's unique ids (1, 0)
+    expect([...calls.attributeIds].sort()).toEqual([0, 1]);
+    // the DecoderBuffer, the Decoder and the Mesh are each destroy()ed once
+    expect(calls.destroyed).toBe(3);
+    // one malloc/free per attribute plus one for the indices
+    expect(calls.freed).toBe(3);
+  });
+
+  test('a required KHR_draco_mesh_compression without a decoder names the option', async () => {
+    const { document } = dracoCompressed();
+    await expect(parseGltf(document)).rejects.toThrow(/options\.draco/);
+  });
+
+  test('Draco attributes are sized from the decoded mesh, not the accessor count', async () => {
+    // some exporters write an accessor `count` that does not match the
+    // number of points the Draco data actually decodes to
+    const { document, stubMesh } = dracoCompressedPointCountMismatch();
+    const { module } = createDracoStub(stubMesh);
+    const result = await parseGltf(document, { draco: module });
+    const { geometry } = result.scene.children[0] as Mesh;
+    expect(geometry.attributes.position.count).toBe(4);
+    expect(Array.from(geometry.attributes.position.data)).toEqual([
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0,
+    ]);
+    expect(Array.from(geometry.index!)).toEqual([0, 1, 2, 1, 2, 3]);
+  });
+
+  test('a plain accessor alongside Draco-compressed ones is read normally', async () => {
+    // e.g. Blender's glTF exporter keeps TANGENT uncompressed
+    const { document, stubMesh } = dracoCompressedWithTangent();
+    const { module } = createDracoStub(stubMesh);
+    const result = await parseGltf(document, { draco: module });
+    const { geometry } = result.scene.children[0] as Mesh;
+    expect(geometry.attributes.tangent.recordSize).toBe(4);
+    expect(Array.from(geometry.attributes.tangent.data)).toEqual([
+      1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1,
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test('a mismatched plain accessor next to Draco-compressed ones is dropped with a warning', async () => {
+    const { document, stubMesh } = dracoCompressedWithTangent({
+      matchingCount: false,
+    });
+    const { module } = createDracoStub(stubMesh);
+    const result = await parseGltf(document, { draco: module });
+    const { geometry } = result.scene.children[0] as Mesh;
+    expect(geometry.attributes.tangent).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/TANGENT.*dropped/)
+    );
   });
 });
