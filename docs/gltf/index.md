@@ -8,6 +8,8 @@ children:
   - ./material-render-state.md
   - ./lights.md
   - ./pbr-material.md
+  - ./loader-core.md
+  - ./bounding-volumes.md
 ---
 
 # Loading glTF models
@@ -91,10 +93,16 @@ light for each light in the scene with a
 [BRDF](./concepts.md#what-a-brdf-is). The page for this step walks through
 the shader term by term.
 
-**7. Loader core.** With everything above in place, the loader is mostly
-bookkeeping: parse the container, turn accessors into attributes, build the
-node tree, create materials and textures. It is the largest amount of code
-but the least new theory.
+**7. Loader core** ([done](./loader-core.md)). With everything above in
+place, the loader is mostly bookkeeping: parse the container, turn
+accessors into attributes, build the node tree, create materials and
+textures. It is the largest amount of code but the least new theory.
+
+**7b. Bounding volumes** ([done](./bounding-volumes.md)). A small step
+that fell out of the loader's demo: framing a model needs its extent, so
+{@link BufferGeometry} gets a cached bounding box and sphere, the scene
+graph gets world-space versions for a subtree, and the loader fills the
+boxes from the `min`/`max` every glTF position accessor carries.
 
 **8. Compression.** Mesh compression shrinks files several times over.
 Quantization comes for free with step 2. Meshopt and Draco need a decoder

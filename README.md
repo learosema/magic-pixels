@@ -11,11 +11,13 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 
 - An API that is somewhat familiar to THREE
 - `Vector`, `Matrix` classes, plus `Float32Array`-backed `Mat2`, `Mat3`, `Mat4` for transforms
+- bounding volumes: `Box3` and `Sphere`, cached per geometry and computed in world space for any subtree
 - a scene graph: `Object3D` with `position`, `quaternion`/`rotation`, `scale`, `children`; `Scene`, `Mesh` and the cameras (`PerspectiveCamera`, `OrthographicCamera`) are `Object3D`s
 - a `Renderer` interface at the "render a scene" level, implemented by `WebGL2Renderer`, which renders a `Scene` through a `Camera` and owns all GPU resources (programs, vertex array objects, buffers, textures)
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - lights as scene graph nodes (`AmbientLight`, `DirectionalLight`, `PointLight`), passed to shaders as built-in uniforms in view space
 - a physically based material (`createPbrMaterial`): the glTF metallic-roughness model with base colour, metallic-roughness, normal, occlusion and emissive maps, alpha modes and an unlit variant
+- a glTF 2.0 loader (`loadGltf`, `parseGltf`) for `.gltf` and `.glb` files: nodes, meshes, PBR materials, textures, cameras and `KHR_lights_punctual` lights (static models; animations and skinning are not supported yet)
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
@@ -197,7 +199,8 @@ pivot.add(moon);
 pivot.rotation.y += dt; // only the pivot (and the moon with it) rotates
 ```
 
-Other useful bits: `object.visible = false` hides an object and its children,
+Other useful bits: `object.name` is a free label (the glTF loader fills it with node names),
+`object.visible = false` hides an object and its children,
 `object.traverse(callback)` visits a subtree, `object.lookAt(target)` points the object's +Z axis
 (for cameras: the viewing direction, -Z) at a point given in the parent's coordinate system.
 To drive `localMatrix` yourself, set `matrixAutoUpdate = false` and flag changes with
@@ -235,6 +238,43 @@ scene.add(bulb);
 the next section. The
 [lights example](https://learosema.github.io/magic-pixels/examples/08-lights/) has a complete
 Lambert shader.
+
+### Loading glTF models
+
+`loadGltf(url)` fetches a `.gltf` or `.glb` file and returns the scene it describes, built from the
+same objects as above: `Object3D` nodes, one `Mesh` per primitive with a `createPbrMaterial()`
+material, `Texture`s, `PerspectiveCamera`/`OrthographicCamera` and `KHR_lights_punctual` lights.
+Relative URIs in the file are resolved against its URL.
+
+```js
+const model = await loadGltf('models/helmet.glb');
+scene.add(model.scene);
+model.scenes; // every scene of the file
+model.nodes; // every node, by glTF index (`node.name` is the glTF name)
+model.cameras; // cameras found on nodes
+model.lights; // lights found on nodes
+model.materials; // every material the loader created
+model.textures; // every texture the loader created
+model.json; // the parsed document, for anything not mapped
+```
+
+`parseGltf(data, options)` does the same for data already in memory: the bytes of a `.glb`, the
+text or bytes of a `.gltf`, or its parsed JSON. Both take options: `baseUrl` (what relative URIs
+resolve against), `fetch` (defaults to the global one; pass your own to load from memory or to
+add headers) and `loadImage` (how images are decoded; defaults to `createImageBitmap`).
+
+```js
+const model = await parseGltf(arrayBuffer, {
+  baseUrl: 'https://example.com/models/',
+});
+```
+
+Supported: `.gltf` with external, data URI or embedded buffers and images, `.glb`, interleaved
+and sparse accessors, quantized attributes (`KHR_mesh_quantization`), every metallic-roughness
+material property and alpha mode, `KHR_materials_unlit`, `KHR_materials_emissive_strength`,
+`KHR_lights_punctual` (spot lights load as point lights). Primitives without normals get flat
+ones. A file that requires an unsupported extension throws; an optional unsupported extension,
+animations, skins and morph targets are skipped with a `console.warn`.
 
 ### Writing shaders
 
@@ -312,6 +352,27 @@ position.needsUpdate = true;
 // hint for frequently changing data (DYNAMIC_DRAW):
 position.dynamic = true;
 ```
+
+### Bounding volumes
+
+A geometry measures its `position` attribute on demand and caches the result:
+
+```js
+geometry.computeBoundingBox(); // Box3 with min/max, also in geometry.boundingBox
+geometry.computeBoundingSphere(); // Sphere centred on the box, radius of the farthest vertex
+geometry.boundingBox = null; // after editing positions: recompute on next use
+```
+
+For a mesh or a whole subtree in world space, `computeBoundingBox(object)` unions the transformed
+geometry boxes and `computeBoundingSphere(object)` grows a sphere around them. Framing a camera:
+
+```js
+const sphere = computeBoundingSphere(model.scene);
+const distance = sphere.radius / Math.sin(((camera.fov / 2) * Math.PI) / 180);
+```
+
+The glTF loader fills `geometry.boundingBox` from the accessor `min`/`max` in the file, so loaded
+models are measured without a pass over the vertices.
 
 ### Freeing GPU resources
 

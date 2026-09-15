@@ -21,6 +21,8 @@ const DEFAULT_UP = new Vector(0, 1, 0);
  * between as a pivot.
  */
 export class Object3D {
+  /** an optional label, e.g. the node name from a glTF file; empty by default */
+  name = '';
   /** translation relative to the parent */
   position = new Vector(0, 0, 0);
   /** rotation relative to the parent, as a unit quaternion */

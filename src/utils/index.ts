@@ -6,6 +6,8 @@ import { Matrix } from './matrix';
 import { Mat2 } from './mat2';
 import { Mat3 } from './mat3';
 import { Mat4 } from './mat4';
+import { Box3 } from './box3';
+import { Sphere } from './sphere';
 import { Quaternion } from './quaternion';
 import { mix, clamp } from './one-liners';
 import { Stopwatch } from './stopwatch';
@@ -19,6 +21,8 @@ export {
   Mat2,
   Mat3,
   Mat4,
+  Box3,
+  Sphere,
   Quaternion,
   calculateSurfaceNormal,
   facesToBuffer,

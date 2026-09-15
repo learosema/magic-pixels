@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="330" viewBox="0 0 700 330" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b7dd8"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9822b"/>
+    </marker>
+  </defs>
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="699" height="329" rx="6" fill="#fff" stroke="#bbb"/>
+
+  <!-- buffer strip -->
+  <text x="24" y="26" fill="#333" font-weight="600">buffer 0</text>
+  <text x="88" y="26" fill="#666">68 bytes</text>
+  <!-- byteStride bracket -->
+  <path d="M 170 40 L 170 34 L 330 34 L 330 40" fill="none" stroke="#333"/>
+  <text x="250" y="30" text-anchor="middle" fill="#333">byteStride 20</text>
+
+  <!-- bufferView 0: indices -->
+  <rect x="24" y="44" width="120" height="28" fill="#eee" stroke="#999"/>
+  <g fill="#333" text-anchor="middle">
+    <text x="44" y="63">i0</text><text x="84" y="63">i1</text><text x="124" y="63">i2</text>
+  </g>
+  <line x1="64" y1="44" x2="64" y2="72" stroke="#999"/>
+  <line x1="104" y1="44" x2="104" y2="72" stroke="#999"/>
+  <!-- padding -->
+  <rect x="144" y="44" width="26" height="28" fill="#fff" stroke="#999" stroke-dasharray="3 2"/>
+  <text x="157" y="63" text-anchor="middle" fill="#999" font-size="10">pad</text>
+
+  <!-- bufferView 1: three interleaved vertices -->
+  <g stroke="#999">
+    <rect x="170" y="44" width="96" height="28" fill="#dbe8fb"/>
+    <rect x="266" y="44" width="64" height="28" fill="#fbe6d0"/>
+    <rect x="330" y="44" width="96" height="28" fill="#dbe8fb"/>
+    <rect x="426" y="44" width="64" height="28" fill="#fbe6d0"/>
+    <rect x="490" y="44" width="96" height="28" fill="#dbe8fb"/>
+    <rect x="586" y="44" width="64" height="28" fill="#fbe6d0"/>
+    <line x1="202" y1="44" x2="202" y2="72"/><line x1="234" y1="44" x2="234" y2="72"/><line x1="298" y1="44" x2="298" y2="72"/>
+    <line x1="362" y1="44" x2="362" y2="72"/><line x1="394" y1="44" x2="394" y2="72"/><line x1="458" y1="44" x2="458" y2="72"/>
+    <line x1="522" y1="44" x2="522" y2="72"/><line x1="554" y1="44" x2="554" y2="72"/><line x1="618" y1="44" x2="618" y2="72"/>
+  </g>
+  <g fill="#333" text-anchor="middle">
+    <text x="186" y="63">x</text><text x="218" y="63">y</text><text x="250" y="63">z</text><text x="282" y="63">u</text><text x="314" y="63">v</text>
+    <text x="346" y="63">x</text><text x="378" y="63">y</text><text x="410" y="63">z</text><text x="442" y="63">u</text><text x="474" y="63">v</text>
+    <text x="506" y="63">x</text><text x="538" y="63">y</text><text x="570" y="63">z</text><text x="602" y="63">u</text><text x="634" y="63">v</text>
+  </g>
+
+  <!-- byte offsets -->
+  <g fill="#666" font-size="10" text-anchor="middle">
+    <text x="24" y="86">0</text>
+    <text x="170" y="86">8</text>
+    <text x="330" y="86">28</text>
+    <text x="490" y="86">48</text>
+    <text x="650" y="86">68</text>
+  </g>
+
+  <!-- bufferView labels -->
+  <path d="M 24 96 L 24 102 L 144 102 L 144 96" fill="none" stroke="#333"/>
+  <text x="84" y="118" text-anchor="middle" fill="#333">bufferView 0</text>
+  <text x="84" y="133" text-anchor="middle" fill="#666" font-size="11">byteOffset 0, byteLength 6</text>
+  <path d="M 170 96 L 170 102 L 650 102 L 650 96" fill="none" stroke="#333"/>
+  <text x="410" y="118" text-anchor="middle" fill="#333">bufferView 1</text>
+  <text x="410" y="133" text-anchor="middle" fill="#666" font-size="11">byteOffset 8, byteLength 60, byteStride 20</text>
+
+  <!-- accessors -->
+  <rect x="170" y="152" width="200" height="40" rx="4" fill="#fff" stroke="#3b7dd8"/>
+  <text x="270" y="168" text-anchor="middle" fill="#3b7dd8" font-weight="600">accessor POSITION</text>
+  <text x="270" y="184" text-anchor="middle" fill="#333" font-size="11">bufferView 1, byteOffset 0, VEC3 float, count 3</text>
+  <path d="M 186 152 L 186 74" fill="none" stroke="#3b7dd8" marker-end="url(#arrow-blue)"/>
+
+  <rect x="400" y="152" width="210" height="40" rx="4" fill="#fff" stroke="#d9822b"/>
+  <text x="505" y="168" text-anchor="middle" fill="#d9822b" font-weight="600">accessor TEXCOORD_0</text>
+  <text x="505" y="184" text-anchor="middle" fill="#333" font-size="11">bufferView 1, byteOffset 12, VEC2 float, count 3</text>
+  <path d="M 420 152 L 420 140 L 282 140 L 282 74" fill="none" stroke="#d9822b" marker-end="url(#arrow-orange)"/>
+
+  <!-- copied result -->
+  <line x1="24" y1="214" x2="676" y2="214" stroke="#ddd"/>
+  <text x="24" y="236" fill="#333" font-weight="600">readAccessor()</text>
+  <text x="124" y="236" fill="#666">copies each accessor into its own tightly packed typed array</text>
+
+  <text x="24" y="270" fill="#3b7dd8">position</text>
+  <text x="80" y="270" fill="#666" font-size="11">Float32Array(9)</text>
+  <g stroke="#999">
+    <rect x="170" y="252" width="288" height="26" fill="#dbe8fb"/>
+    <line x1="202" y1="252" x2="202" y2="278"/><line x1="234" y1="252" x2="234" y2="278"/><line x1="266" y1="252" x2="266" y2="278"/>
+    <line x1="298" y1="252" x2="298" y2="278"/><line x1="330" y1="252" x2="330" y2="278"/><line x1="362" y1="252" x2="362" y2="278"/>
+    <line x1="394" y1="252" x2="394" y2="278"/><line x1="426" y1="252" x2="426" y2="278"/>
+  </g>
+  <g fill="#333" text-anchor="middle">
+    <text x="186" y="270">x</text><text x="218" y="270">y</text><text x="250" y="270">z</text>
+    <text x="282" y="270">x</text><text x="314" y="270">y</text><text x="346" y="270">z</text>
+    <text x="378" y="270">x</text><text x="410" y="270">y</text><text x="442" y="270">z</text>
+  </g>
+
+  <text x="24" y="306" fill="#d9822b">uv</text>
+  <text x="80" y="306" fill="#666" font-size="11">Float32Array(6)</text>
+  <g stroke="#999">
+    <rect x="170" y="288" width="192" height="26" fill="#fbe6d0"/>
+    <line x1="202" y1="288" x2="202" y2="314"/><line x1="234" y1="288" x2="234" y2="314"/><line x1="266" y1="288" x2="266" y2="314"/>
+    <line x1="298" y1="288" x2="298" y2="314"/><line x1="330" y1="288" x2="330" y2="314"/>
+  </g>
+  <g fill="#333" text-anchor="middle">
+    <text x="186" y="306">u</text><text x="218" y="306">v</text><text x="250" y="306">u</text>
+    <text x="282" y="306">v</text><text x="314" y="306">u</text><text x="346" y="306">v</text>
+  </g>
+</svg>
