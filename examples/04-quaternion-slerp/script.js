@@ -1,0 +1,79 @@
+import {
+  WebGL2Renderer,
+  Scene,
+  Mesh,
+  PerspectiveCamera,
+  createBoxGeometry,
+  createBasicMaterial,
+  createNormalMaterial,
+  Quaternion,
+  Vector,
+  Stopwatch,
+} from '../magic-pixels.js';
+
+const canvas = document.getElementById('canvas');
+const renderer = new WebGL2Renderer(canvas);
+renderer.setClearColor('#111318');
+
+const scene = new Scene();
+const geometry = createBoxGeometry(1, 1, 1);
+const material = createNormalMaterial();
+
+const slerpCube = new Mesh(geometry, material);
+slerpCube.position.set(-1.4, 0, 0);
+const eulerCube = new Mesh(geometry, material);
+eulerCube.position.set(1.4, 0, 0);
+scene.add(slerpCube, eulerCube);
+
+// the two orientations: no rotation, and a 170° turn around the diagonal
+const axis = new Vector(1, 1, 1).normalized;
+const from = new Quaternion();
+const to = Quaternion.fromAxisAngle(axis, (170 * Math.PI) / 180);
+
+// a rod along the axis through the slerp cube, so the axis is visible;
+// its own +Y is turned onto the axis by a quaternion as well
+const rod = new Mesh(
+  createBoxGeometry(0.04, 3.2, 0.04),
+  createBasicMaterial('#ffcc33')
+);
+rod.position.set(-1.4, 0, 0);
+const up = new Vector(0, 1, 0);
+rod.quaternion.setFromAxisAngle(
+  up.cross(axis).normalized,
+  Math.acos(up.dot(axis))
+);
+scene.add(rod);
+// the same two orientations as Euler angles, for the right cube
+const fromEuler = from.toEuler(new Vector());
+const toEuler = to.toEuler(new Vector());
+
+const camera = new PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(0, 0, 6);
+
+function resize() {
+  const { innerWidth: width, innerHeight: height } = window;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)).setSize(width, height);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+const clock = new Stopwatch().start();
+
+function frame() {
+  const seconds = clock.elapsedTime / 1000;
+  // t swings 0 -> 1 -> 0 every four seconds
+  const t = (1 - Math.cos(seconds * (Math.PI / 2))) / 2;
+
+  // left: shortest arc, constant speed
+  slerpCube.quaternion.slerpQuaternions(from, to, t);
+
+  // right: each Euler angle interpolated on its own
+  const e = fromEuler.add(toEuler.sub(fromEuler).mul(t));
+  eulerCube.rotation.set(e.x, e.y, e.z);
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
