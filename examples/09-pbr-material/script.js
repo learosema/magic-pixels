@@ -1,0 +1,203 @@
+import {
+  WebGL2Renderer,
+  Scene,
+  Object3D,
+  Mesh,
+  PerspectiveCamera,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
+  createPlaneGeometry,
+  createSphereGeometry,
+  createPbrMaterial,
+  Texture,
+  Filter,
+  Wrapping,
+  ColorSpace,
+  Vector,
+  Stopwatch,
+} from '../magic-pixels.js';
+
+// ---------------------------------------------------------- textures
+
+// A checkerboard painted with a 2D canvas is an sRGB image like any
+// photo would be: the texture says so and the GPU decodes it to linear
+// values when the shader samples it.
+function createCheckerImage(size = 512, tiles = 8) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const tile = size / tiles;
+  for (let y = 0; y < tiles; y++) {
+    for (let x = 0; x < tiles; x++) {
+      ctx.fillStyle = (x + y) % 2 ? '#6d7482' : '#8e95a3';
+      ctx.fillRect(x * tile, y * tile, tile, tile);
+    }
+  }
+  return canvas;
+}
+
+// A normal map holds directions, not colours, so it is linear data.
+// The height field is a grid of round bumps; the normal is the cross
+// product of the surface's tangents, which for a height field h(x, y)
+// is (-dh/dx, -dh/dy, 1) before normalising. glTF's convention is
+// +X right, +Y up in the image, +Z out of the surface, each mapped
+// from -1..1 to 0..255.
+function createBumpNormalImage(size = 512, bumps = 8) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(size, size);
+  const height = (x, y) => {
+    const fx = ((x / size) * bumps) % 1;
+    const fy = ((y / size) * bumps) % 1;
+    const d = Math.hypot(fx - 0.5, fy - 0.5) * 2;
+    return d < 0.8 ? Math.cos(((d / 0.8) * Math.PI) / 2) ** 2 : 0;
+  };
+  const strength = 12;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (height(x + 1, y) - height(x - 1, y)) * strength;
+      const dy = (height(x, y + 1) - height(x, y - 1)) * strength;
+      // image y grows downwards, tangent-space y points up
+      const n = new Vector(-dx, dy, 1).normalized;
+      const i = (y * size + x) * 4;
+      image.data[i] = (n.x * 0.5 + 0.5) * 255;
+      image.data[i + 1] = (n.y * 0.5 + 0.5) * 255;
+      image.data[i + 2] = (n.z * 0.5 + 0.5) * 255;
+      image.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+const sampling = {
+  minFilter: Filter.LINEAR_MIPMAP_LINEAR,
+  magFilter: Filter.LINEAR,
+  wrapS: Wrapping.REPEAT,
+  wrapT: Wrapping.REPEAT,
+};
+const checker = new Texture(createCheckerImage(), {
+  ...sampling,
+  colorSpace: ColorSpace.SRGB,
+});
+const bumps = new Texture(createBumpNormalImage(), sampling);
+
+// ------------------------------------------------------------- scene
+
+const canvas = document.getElementById('canvas');
+const renderer = new WebGL2Renderer(canvas);
+renderer.setClearColor('#0b0d12');
+
+const scene = new Scene();
+
+// The floor: base colour map (sRGB) and normal map (linear). The plane
+// geometry has no tangent attribute, so the shader reconstructs the
+// tangent from screen-space derivatives.
+const floor = new Mesh(
+  createPlaneGeometry(14, 14, 1, 1),
+  createPbrMaterial({
+    baseColorMap: checker,
+    normalMap: bumps,
+    normalScale: 1,
+    metallicFactor: 0,
+    roughnessFactor: 0.55,
+  })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.7;
+scene.add(floor);
+
+// The sphere grid. All materials of a row share the same shader
+// source (same maps: none), so the renderer compiles one program for
+// the whole grid and only the factors change between draws.
+const columns = 6;
+const rows = 3;
+const spacing = 1.5;
+const sphereGeometry = createSphereGeometry(0.55, 48, 24);
+const rowColors = ['#c8402e', '#c8a03a', '#f0d590'];
+for (let row = 0; row < rows; row++) {
+  for (let column = 0; column < columns; column++) {
+    const roughness = 0.05 + (0.95 * column) / (columns - 1);
+    const metallic = row / (rows - 1);
+    const sphere = new Mesh(
+      sphereGeometry,
+      createPbrMaterial({
+        baseColorFactor: hexToLinear(rowColors[row]),
+        roughnessFactor: roughness,
+        metallicFactor: metallic,
+      })
+    );
+    sphere.position.set(
+      (column - (columns - 1) / 2) * spacing,
+      0,
+      ((rows - 1) / 2 - row) * spacing
+    );
+    scene.add(sphere);
+  }
+}
+
+// Colour factors are linear RGB. A hex colour is sRGB, so decode it
+// the same way the GPU decodes an sRGB texture.
+function hexToLinear(hex) {
+  const srgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return [
+    ...srgb.map((c) =>
+      c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    ),
+    1,
+  ];
+}
+
+// ------------------------------------------------------------ lights
+
+scene.add(new AmbientLight('#2a3350', 0.5));
+
+const sun = new DirectionalLight('#fff1d6', 1.2);
+scene.add(sun);
+
+// The bulb rides on a pivot; its child is an unlit sphere in the
+// bulb's own colour, so it looks like it glows.
+const bulbPivot = new Object3D();
+const bulb = new PointLight('#ffb15e', 6, 9);
+bulb.position.set(3, 1.2, 0);
+bulb.add(
+  new Mesh(
+    createSphereGeometry(0.1, 16, 8),
+    createPbrMaterial({
+      unlit: true,
+      baseColorFactor: hexToLinear('#ffb15e'),
+    })
+  )
+);
+bulbPivot.add(bulb);
+scene.add(bulbPivot);
+
+// ----------------------------------------------------------- camera
+
+const camera = new PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(0, 4.5, 9.5);
+camera.lookAt(new Vector(0, -0.2, 0));
+
+function resize() {
+  const { innerWidth: width, innerHeight: height } = window;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)).setSize(width, height);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+const clock = new Stopwatch().start();
+const origin = new Vector(0, 0, 0);
+
+function frame() {
+  const t = clock.elapsedTime / 1000;
+  sun.position.set(Math.cos(t * 0.2) * 6, 3, Math.sin(t * 0.2) * 6);
+  sun.lookAt(origin);
+  bulbPivot.rotation.y = t * 0.6;
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
