@@ -6,6 +6,9 @@
     <title>glTF loader &mdash; magic-pixels example</title>
     <link rel="stylesheet" href="../style.css" />
     <style>
+      #canvas {
+        touch-action: none;
+      }
       .controls {
         pointer-events: auto;
         display: flex;
@@ -47,16 +50,9 @@
       <div>
         <h1>glTF loader</h1>
         <p>
-          <code>loadGltf(url)</code> fetches a Khronos sample model and turns it
-          into a scene: nodes, meshes, PBR materials, textures, cameras and
-          lights, framed from its <code>computeBoundingSphere()</code>. Drag to
-          turn it. Drop your own <code>.glb</code> (or a
-          <code>.gltf</code> together with its <code>.bin</code> and images)
-          anywhere on the page to load it from memory through the
-          <code>fetch</code> option. Every load passes
-          <code>options.meshopt</code>/<code>options.draco</code>, real decoders
-          loaded from a CDN, so a meshopt- or Draco-compressed file, sample or
-          dropped, decodes automatically.
+          <code>loadGltf(url)</code> turns a glTF file into a scene. Drag to
+          turn it, or drop your own <code>.glb</code> (or
+          <code>.gltf</code> with its <code>.bin</code> and images).
         </p>
         <div class="controls">
           <label
@@ -73,12 +69,22 @@
     </div>
     <!--
       The Draco decoder is only published as a classic (non-module) script
-      that defines a global factory function; the meshopt decoder below is
-      loaded as an ES module import instead, since meshoptimizer publishes
-      one. Neither is bundled with magic-pixels: both are options the
-      loader accepts, never a dependency.
+      that defines a global factory function; meshopt's is a real ES
+      module. Neither is bundled with magic-pixels: both are options the
+      loader accepts, never a dependency. Most sample models need neither,
+      so both are loaded lazily on first use (below) instead of upfront;
+      these hints just warm the HTTP cache in idle time so first use
+      doesn't pay the fetch latency.
     -->
-    <script src="https://www.gstatic.com/draco/versioned/decoders/1.5.7/draco_decoder.js"></script>
+    <link
+      rel="prefetch"
+      as="script"
+      href="https://www.gstatic.com/draco/versioned/decoders/1.5.7/draco_decoder.js"
+    />
+    <link
+      rel="modulepreload"
+      href="https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs"
+    />
     <script type="module">
       import {
         WebGL2Renderer,
@@ -94,7 +100,6 @@
         parseGltf,
         computeBoundingSphere,
       } from '../magic-pixels.js';
-      import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs';
 
       // ---------------------------------------------------------- models
 
@@ -198,10 +203,40 @@
         extensionsUsed: ['KHR_draco_mesh_compression'],
       };
 
+      // Injected on first use rather than a static <script> tag, since most
+      // sample models aren't Draco-compressed; the prefetch link above just
+      // means the bytes are likely already cached by the time this runs.
+      let dracoScriptPromise;
+      function loadDracoScript() {
+        dracoScriptPromise ??= new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src =
+            'https://www.gstatic.com/draco/versioned/decoders/1.5.7/draco_decoder.js';
+          script.onload = resolve;
+          script.onerror = () =>
+            reject(new Error('failed to load the Draco decoder script'));
+          document.head.append(script);
+        });
+        return dracoScriptPromise;
+      }
+
       let dracoModulePromise;
       function dracoModule() {
-        dracoModulePromise ??= DracoDecoderModule({});
+        dracoModulePromise ??= loadDracoScript().then(() =>
+          DracoDecoderModule({})
+        );
         return dracoModulePromise;
+      }
+
+      // Same reasoning as Draco above: most sample models aren't
+      // meshopt-compressed, so the module is only fetched on first use.
+      let meshoptModulePromise;
+      function meshoptModule() {
+        meshoptModulePromise ??=
+          import('https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs').then(
+            (m) => m.MeshoptDecoder
+          );
+        return meshoptModulePromise;
       }
 
       // The loader options every load below passes: it only decodes a
@@ -209,7 +244,7 @@
       // extension, so passing both unconditionally is what lets any
       // sample, drop, or embedded model "just work".
       async function decoderOptions() {
-        return { meshopt: MeshoptDecoder, draco: await dracoModule() };
+        return { meshopt: await meshoptModule(), draco: await dracoModule() };
       }
 
       const MODELS = [
@@ -243,11 +278,11 @@
         sample('Sponza (large, many files)', 'Sponza/glTF/Sponza.gltf'),
         {
           name: 'Box (EXT_meshopt_compression, embedded)',
-          load: () => {
+          load: async () => {
             const bytes = Uint8Array.from(atob(MESHOPT_BOX_GLB), (c) =>
               c.charCodeAt(0)
             );
-            return parseGltf(bytes, { meshopt: MeshoptDecoder });
+            return parseGltf(bytes, { meshopt: await meshoptModule() });
           },
         },
         {
