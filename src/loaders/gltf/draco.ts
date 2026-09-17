@@ -3,7 +3,8 @@ import type { TypedArray } from '../../geometries/buffer-geometry';
 import { COMPONENT_ARRAYS, TYPE_SIZES, getBufferView } from './accessors';
 import type { GltfBuffers } from './accessors';
 import type {
-  GltfAccessor,
+  GltfAccessorType,
+  GltfComponentType,
   GltfDracoMeshCompression,
   GltfJson,
   GltfPrimitive,
@@ -79,6 +80,40 @@ type DracoMesh = InstanceType<DracoDecoderModule['Mesh']>;
 type DracoDecoder = InstanceType<DracoDecoderModule['Decoder']>;
 type DracoAttribute = ReturnType<DracoDecoder['GetAttributeByUniqueId']>;
 
+/** Shape of one Draco-compressed attribute, independent of the glTF JSON it came from */
+export type DracoAttributeSpec = {
+  /** id passed to `GetAttributeByUniqueId`, from `KHR_draco_mesh_compression.attributes` */
+  uniqueId: number;
+  type: GltfAccessorType;
+  componentType: GltfComponentType;
+  normalized: boolean;
+};
+
+/**
+ * Everything {@link decodeDraco} needs to decode one primitive: the raw
+ * compressed bytes and the shape of each attribute, both already resolved
+ * from the glTF JSON. Doing that resolution separately (in
+ * {@link extractDracoRequest}) means the decode step itself only touches
+ * typed arrays and the Draco module, so it can run on the main thread or
+ * inside a worker unchanged.
+ */
+export type DracoRequest = {
+  bytes: Uint8Array;
+  /** glTF attribute semantic (`POSITION`, `NORMAL`, ...) to its Draco shape */
+  attributes: Record<string, DracoAttributeSpec>;
+  /** the primitive's index accessor componentType, if any (decides 16 vs 32 bit indices) */
+  indexComponentType: GltfComponentType | undefined;
+};
+
+/** Result of {@link decodeDraco}: plain typed arrays, not yet {@link BufferAttribute}s */
+export type DracoResult = {
+  attributes: Record<
+    string,
+    { data: TypedArray; recordSize: number; normalized: boolean }
+  >;
+  indices: Uint16Array | Uint32Array;
+};
+
 /** glTF `componentType` to the module's `DT_*` constant and `HEAP*` view */
 const COMPONENT_INFO: Record<
   number,
@@ -113,13 +148,13 @@ function readAttribute(
   decoder: DracoDecoder,
   mesh: DracoMesh,
   attribute: DracoAttribute,
-  accessor: GltfAccessor
+  spec: DracoAttributeSpec
 ): TypedArray {
-  const info = COMPONENT_INFO[accessor.componentType];
-  const Ctor = COMPONENT_ARRAYS[accessor.componentType];
+  const info = COMPONENT_INFO[spec.componentType];
+  const Ctor = COMPONENT_ARRAYS[spec.componentType];
   if (!info || !Ctor) {
     throw Error(
-      `glTF: Draco attribute has unsupported componentType ${accessor.componentType}`
+      `glTF: Draco attribute has unsupported componentType ${spec.componentType}`
     );
   }
   // `GetAttributeDataArrayForAllPoints` writes exactly one value per
@@ -128,7 +163,7 @@ function readAttribute(
   // decoded mesh's own point count, so `mesh.num_points()` - not the
   // accessor - is what decides how many elements come back. The accessor
   // still supplies the *shape* (componentType, type, normalized).
-  const count = mesh.num_points() * TYPE_SIZES[accessor.type];
+  const count = mesh.num_points() * TYPE_SIZES[spec.type];
   const byteLength = count * Ctor.BYTES_PER_ELEMENT;
   const pointer = module._malloc(byteLength);
   try {
@@ -178,25 +213,59 @@ function readIndices(
 }
 
 /**
- * Decode a `KHR_draco_mesh_compression` primitive: every attribute the
- * extension lists, keyed by its glTF semantic (`POSITION`, `NORMAL`, ...)
- * and shaped like the primitive's own accessor (count, type, normalized
- * come from the JSON accessor, not from Draco), plus the triangle indices.
- * Every Draco object is destroyed before returning, decoded or not.
+ * Resolve a `KHR_draco_mesh_compression` primitive against the glTF JSON
+ * into a self-contained {@link DracoRequest}: the compressed bytes and the
+ * shape of every attribute the extension lists (an attribute missing its
+ * accessor is skipped). This is the only part of decoding that needs the
+ * document and runs on the main thread, whether the actual decode happens
+ * there too or is handed to a worker.
  */
-export function decodeDracoPrimitive(
+export function extractDracoRequest(
   json: GltfJson,
   primitive: GltfPrimitive,
   ext: GltfDracoMeshCompression,
-  buffers: GltfBuffers,
-  module: DracoDecoderModule
-): {
-  attributes: Record<string, BufferAttribute>;
-  indices: Uint16Array | Uint32Array;
-} {
+  buffers: GltfBuffers
+): DracoRequest {
   const bytes = getBufferView(json, ext.bufferView, buffers);
+  const attributes: Record<string, DracoAttributeSpec> = {};
+  for (const [semantic, uniqueId] of Object.entries(ext.attributes)) {
+    const accessorIndex = primitive.attributes[semantic];
+    const accessor =
+      accessorIndex !== undefined ? json.accessors?.[accessorIndex] : undefined;
+    if (!accessor) {
+      continue;
+    }
+    attributes[semantic] = {
+      uniqueId,
+      type: accessor.type,
+      componentType: accessor.componentType,
+      normalized: accessor.normalized ?? false,
+    };
+  }
+  const indexAccessor =
+    primitive.indices !== undefined
+      ? json.accessors?.[primitive.indices]
+      : undefined;
+  return {
+    bytes,
+    attributes,
+    indexComponentType: indexAccessor?.componentType,
+  };
+}
+
+/**
+ * Decode a Draco-compressed mesh: every attribute {@link DracoRequest}
+ * lists, keyed by its glTF semantic (`POSITION`, `NORMAL`, ...), plus the
+ * triangle indices. Every Draco object is destroyed before returning,
+ * decoded or not. Touches only typed arrays and the decoder module, so it
+ * runs unchanged on the main thread or inside a worker.
+ */
+export function decodeDraco(
+  module: DracoDecoderModule,
+  request: DracoRequest
+): DracoResult {
   const decoderBuffer = new module.DecoderBuffer();
-  decoderBuffer.Init(bytes, bytes.byteLength);
+  decoderBuffer.Init(request.bytes, request.bytes.byteLength);
   const decoder = new module.Decoder();
   const geometryType = decoder.GetEncodedGeometryType(decoderBuffer);
   if (geometryType !== module.TRIANGULAR_MESH) {
@@ -214,30 +283,18 @@ export function decodeDracoPrimitive(
     throw Error(`glTF: Draco decoding failed: ${message}`);
   }
   try {
-    const attributes: Record<string, BufferAttribute> = {};
-    for (const [semantic, uniqueId] of Object.entries(ext.attributes)) {
-      const accessorIndex = primitive.attributes[semantic];
-      const accessor =
-        accessorIndex !== undefined
-          ? json.accessors?.[accessorIndex]
-          : undefined;
-      if (!accessor) {
-        continue;
-      }
-      const attribute = decoder.GetAttributeByUniqueId(mesh, uniqueId);
-      const data = readAttribute(module, decoder, mesh, attribute, accessor);
-      attributes[semantic] = new BufferAttribute(
+    const attributes: DracoResult['attributes'] = {};
+    for (const [semantic, spec] of Object.entries(request.attributes)) {
+      const attribute = decoder.GetAttributeByUniqueId(mesh, spec.uniqueId);
+      const data = readAttribute(module, decoder, mesh, attribute, spec);
+      attributes[semantic] = {
         data,
-        TYPE_SIZES[accessor.type],
-        accessor.normalized ?? false
-      );
+        recordSize: TYPE_SIZES[spec.type],
+        normalized: spec.normalized,
+      };
     }
-    const indexAccessor =
-      primitive.indices !== undefined
-        ? json.accessors?.[primitive.indices]
-        : undefined;
     const wide =
-      indexAccessor?.componentType === 5125 || mesh.num_points() > 65535;
+      request.indexComponentType === 5125 || mesh.num_points() > 65535;
     const indices = readIndices(module, decoder, mesh, wide);
     return { attributes, indices };
   } finally {
@@ -245,4 +302,38 @@ export function decodeDracoPrimitive(
     module.destroy(decoder);
     module.destroy(decoderBuffer);
   }
+}
+
+/** Turn a {@link DracoResult}'s plain typed arrays into {@link BufferAttribute}s */
+export function wrapDracoResult(raw: DracoResult): {
+  attributes: Record<string, BufferAttribute>;
+  indices: Uint16Array | Uint32Array;
+} {
+  const attributes: Record<string, BufferAttribute> = {};
+  for (const [semantic, { data, recordSize, normalized }] of Object.entries(
+    raw.attributes
+  )) {
+    attributes[semantic] = new BufferAttribute(data, recordSize, normalized);
+  }
+  return { attributes, indices: raw.indices };
+}
+
+/**
+ * Decode a `KHR_draco_mesh_compression` primitive on the main thread:
+ * {@link extractDracoRequest} plus {@link decodeDraco} plus
+ * {@link wrapDracoResult}. {@link DracoWorkerPool} runs the same two
+ * middle steps inside a worker instead.
+ */
+export function decodeDracoPrimitive(
+  json: GltfJson,
+  primitive: GltfPrimitive,
+  ext: GltfDracoMeshCompression,
+  buffers: GltfBuffers,
+  module: DracoDecoderModule
+): {
+  attributes: Record<string, BufferAttribute>;
+  indices: Uint16Array | Uint32Array;
+} {
+  const request = extractDracoRequest(json, primitive, ext, buffers);
+  return wrapDracoResult(decodeDraco(module, request));
 }

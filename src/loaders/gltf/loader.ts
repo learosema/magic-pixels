@@ -28,8 +28,14 @@ import type {
 } from '../../scene';
 import { getBufferView, readAccessor, readIndices } from './accessors';
 import type { GltfBuffers } from './accessors';
-import { decodeDracoPrimitive } from './draco';
+import {
+  decodeDracoPrimitive,
+  extractDracoRequest,
+  wrapDracoResult,
+} from './draco';
 import type { DracoDecoderModule } from './draco';
+import { DracoWorkerPool } from './draco-worker-pool';
+import type { DracoWorkerOptions } from './draco-worker-pool';
 import { isGlb, parseGlb } from './glb';
 import { decodeMeshoptBufferViews } from './meshopt';
 import type { MeshoptDecoder } from './meshopt';
@@ -68,12 +74,14 @@ export type GltfLoaderOptions = {
    */
   meshopt?: MeshoptDecoder;
   /**
-   * Decoder module for `KHR_draco_mesh_compression`: the result of
+   * Decoder for `KHR_draco_mesh_compression`, required only if the file
+   * uses the extension; magic-pixels never bundles a decoder. Either an
+   * already-initialized {@link DracoDecoderModule} - the result of
    * `createDecoderModule()` from `draco3d`, or the `DracoDecoderModule`
-   * global of the CDN build. Required only if the file uses the
-   * extension; magic-pixels never bundles a decoder.
+   * global of the CDN build - decoded synchronously on the main thread, or
+   * {@link DracoWorkerOptions} to decode in a pool of Web Workers instead.
    */
-  draco?: DracoDecoderModule;
+  draco?: DracoDecoderModule | DracoWorkerOptions;
 };
 
 /** What {@link loadGltf} and {@link parseGltf} return */
@@ -266,6 +274,13 @@ function toBlob(bytes: Uint8Array, type: string | undefined): Blob {
   return new Blob([bytes.slice()], type ? { type } : undefined);
 }
 
+/** `DracoWorkerOptions` is the only shape of `options.draco` with a `decoderPath` */
+function isDracoWorkerOptions(
+  draco: DracoDecoderModule | DracoWorkerOptions
+): draco is DracoWorkerOptions {
+  return 'decoderPath' in draco;
+}
+
 /** The attributes of a primitive that change the material's shader */
 type MaterialVariant = {
   drawMode: DrawMode;
@@ -287,6 +302,8 @@ class GltfParser {
   private readonly baseUrl: string | undefined;
   private readonly meshopt: MeshoptDecoder | undefined;
   private readonly draco: DracoDecoderModule | undefined;
+  private readonly dracoWorkerOptions: DracoWorkerOptions | undefined;
+  private dracoPool: DracoWorkerPool | undefined;
 
   /** the document exactly as given, returned to the caller as `result.json` */
   private readonly originalJson: GltfJson;
@@ -312,10 +329,22 @@ class GltfParser {
         : null);
     this.loadImage = options.loadImage ?? this.defaultLoadImage.bind(this);
     this.meshopt = options.meshopt;
-    this.draco = options.draco;
+    if (options.draco && isDracoWorkerOptions(options.draco)) {
+      this.dracoWorkerOptions = options.draco;
+    } else {
+      this.draco = options.draco;
+    }
   }
 
   async parse(): Promise<GltfResult> {
+    try {
+      return await this.parseInternal();
+    } finally {
+      this.dracoPool?.dispose();
+    }
+  }
+
+  private async parseInternal(): Promise<GltfResult> {
     this.checkAsset();
     this.checkExtensions();
     const rawBuffers = await this.loadBuffers();
@@ -618,18 +647,32 @@ class GltfParser {
     const geometry = new BufferGeometry();
     const dracoExt = primitive.extensions?.KHR_draco_mesh_compression;
     if (dracoExt) {
-      if (!this.draco) {
+      let decoded: {
+        attributes: Record<string, BufferAttribute>;
+        indices: Uint16Array | Uint32Array;
+      };
+      if (this.draco) {
+        decoded = decodeDracoPrimitive(
+          this.json,
+          primitive,
+          dracoExt,
+          this.buffers,
+          this.draco
+        );
+      } else if (this.dracoWorkerOptions) {
+        this.dracoPool ??= new DracoWorkerPool(this.dracoWorkerOptions);
+        const request = extractDracoRequest(
+          this.json,
+          primitive,
+          dracoExt,
+          this.buffers
+        );
+        decoded = wrapDracoResult(await this.dracoPool.decode(request));
+      } else {
         throw Error(
           'glTF: the file uses KHR_draco_mesh_compression; pass options.draco'
         );
       }
-      const decoded = decodeDracoPrimitive(
-        this.json,
-        primitive,
-        dracoExt,
-        this.buffers,
-        this.draco
-      );
       for (const [semantic, attribute] of Object.entries(decoded.attributes)) {
         const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
         geometry.setAttribute(name, attribute);

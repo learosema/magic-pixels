@@ -6,3 +6,4 @@ coverage
 *.log
 site
 examples/magic-pixels.js
+examples/draco-worker.js
