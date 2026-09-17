@@ -10,6 +10,7 @@ import type { GltfJson } from '../types';
 export { GltfBuilder, buildGlb, toDataUri, componentTypeOf } from './builder';
 export { createDracoStub } from './draco-stub';
 export type { DracoStubAttribute, DracoStubMesh } from './draco-stub';
+export { createFakeDracoWorkerClass } from './draco-worker-stub';
 
 /** A right triangle in the XY plane, counter-clockwise */
 export const TRIANGLE_POSITIONS = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);

@@ -5,6 +5,7 @@ import type { Glb } from './glb';
 import { readAccessor, readAccessorData, readIndices } from './accessors';
 import { decodeDracoPrimitive } from './draco';
 import type { DracoDecoderModule } from './draco';
+import type { DracoWorkerOptions } from './draco-worker-pool';
 import { decodeMeshoptBufferViews } from './meshopt';
 import type { MeshoptDecoder } from './meshopt';
 import type {
@@ -43,6 +44,7 @@ export type {
   GltfResult,
   Glb,
   DracoDecoderModule,
+  DracoWorkerOptions,
   MeshoptDecoder,
   GltfAccessor,
   GltfAccessorType,

@@ -30,6 +30,7 @@ import {
   TRIANGLE_POSITIONS,
   camerasAndLights,
   createDracoStub,
+  createFakeDracoWorkerClass,
   dracoCompressed,
   dracoCompressedPointCountMismatch,
   dracoCompressedWithTangent,
@@ -716,6 +717,28 @@ describe('compression', () => {
   test('a required KHR_draco_mesh_compression without a decoder names the option', async () => {
     const { document } = dracoCompressed();
     await expect(parseGltf(document)).rejects.toThrow(/options\.draco/);
+  });
+
+  test('KHR_draco_mesh_compression decodes through a worker pool given { decoderPath }', async () => {
+    const { document, stubMesh } = dracoCompressed();
+    const { FakeWorker, calls } = createFakeDracoWorkerClass(stubMesh);
+    vi.stubGlobal('Worker', FakeWorker);
+    try {
+      const result = await parseGltf(document, {
+        draco: { decoderPath: 'https://example.test/' },
+      });
+      const { geometry } = result.scene.children[0] as Mesh;
+
+      expect(Array.from(geometry.attributes.position.data)).toEqual([
+        0, 0, 0, 1, 0, 0, 0, 1, 0,
+      ]);
+      expect(Array.from(geometry.index!)).toEqual([0, 1, 2]);
+      expect(calls.constructed).toBe(1);
+      // the pool is disposed once parseGltf's own primitives are all decoded
+      expect(calls.terminated).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   test('Draco attributes are sized from the decoded mesh, not the accessor count', async () => {
