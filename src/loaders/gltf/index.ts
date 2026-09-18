@@ -8,6 +8,7 @@ import type { DracoDecoderModule } from './draco';
 import type { DracoWorkerOptions } from './draco-worker-pool';
 import { decodeMeshoptBufferViews } from './meshopt';
 import type { MeshoptDecoder } from './meshopt';
+import type { MeshoptWorkerOptions } from './meshopt-worker-pool';
 import type {
   GltfAccessor,
   GltfAccessorType,
@@ -46,6 +47,7 @@ export type {
   DracoDecoderModule,
   DracoWorkerOptions,
   MeshoptDecoder,
+  MeshoptWorkerOptions,
   GltfAccessor,
   GltfAccessorType,
   GltfAlphaMode,

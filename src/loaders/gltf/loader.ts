@@ -39,6 +39,7 @@ import type { DracoWorkerOptions } from './draco-worker-pool';
 import { isGlb, parseGlb } from './glb';
 import { decodeMeshoptBufferViews } from './meshopt';
 import type { MeshoptDecoder } from './meshopt';
+import type { MeshoptWorkerOptions } from './meshopt-worker-pool';
 import type {
   GltfJson,
   GltfMesh,
@@ -68,11 +69,14 @@ export type GltfLoaderOptions = {
    */
   loadImage?: (source: Blob | string) => Promise<TextureData>;
   /**
-   * Decoder for `EXT_meshopt_compression`, exactly the shape of
-   * `MeshoptDecoder` from the `meshoptimizer` package. Required only if
-   * the file uses the extension; magic-pixels never bundles a decoder.
+   * Decoder for `EXT_meshopt_compression`, required only if the file uses
+   * the extension; magic-pixels never bundles a decoder. Either an
+   * already-initialized {@link MeshoptDecoder} - exactly the shape of the
+   * `meshoptimizer` package's export - decoded on the main thread, or
+   * {@link MeshoptWorkerOptions} to decode in a pool of Web Workers
+   * instead.
    */
-  meshopt?: MeshoptDecoder;
+  meshopt?: MeshoptDecoder | MeshoptWorkerOptions;
   /**
    * Decoder for `KHR_draco_mesh_compression`, required only if the file
    * uses the extension; magic-pixels never bundles a decoder. Either an
@@ -300,7 +304,7 @@ class GltfParser {
   private readonly fetch: typeof globalThis.fetch | null;
   private readonly loadImage: (source: Blob | string) => Promise<TextureData>;
   private readonly baseUrl: string | undefined;
-  private readonly meshopt: MeshoptDecoder | undefined;
+  private readonly meshopt: MeshoptDecoder | MeshoptWorkerOptions | undefined;
   private readonly draco: DracoDecoderModule | undefined;
   private readonly dracoWorkerOptions: DracoWorkerOptions | undefined;
   private dracoPool: DracoWorkerPool | undefined;

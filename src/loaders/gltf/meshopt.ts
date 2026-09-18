@@ -1,5 +1,7 @@
 import type { GltfBuffers } from './accessors';
-import type { GltfJson } from './types';
+import { MeshoptWorkerPool } from './meshopt-worker-pool';
+import type { MeshoptWorkerOptions } from './meshopt-worker-pool';
+import type { GltfBufferView, GltfJson, GltfMeshoptCompression } from './types';
 
 /**
  * Minimal structural interface for `EXT_meshopt_compression` decoding,
@@ -19,6 +21,22 @@ export type MeshoptDecoder = {
   ): void;
 };
 
+/** `MeshoptWorkerOptions` is the only shape of `options.meshopt` with a `moduleUrl` */
+function isMeshoptWorkerOptions(
+  decoder: MeshoptDecoder | MeshoptWorkerOptions
+): decoder is MeshoptWorkerOptions {
+  return 'moduleUrl' in decoder;
+}
+
+/** One decode call, however it actually runs - synchronously or on a worker */
+type DecodeOne = (
+  count: number,
+  size: number,
+  source: Uint8Array,
+  mode: GltfMeshoptCompression['mode'],
+  filter: GltfMeshoptCompression['filter']
+) => Promise<Uint8Array>;
+
 /**
  * Decode every bufferView carrying `EXT_meshopt_compression` into a plain
  * `Uint8Array`, appended to `buffers`, and return a patched `json` whose
@@ -30,7 +48,7 @@ export type MeshoptDecoder = {
 export async function decodeMeshoptBufferViews(
   json: GltfJson,
   buffers: GltfBuffers,
-  decoder: MeshoptDecoder | undefined
+  decoder: MeshoptDecoder | MeshoptWorkerOptions | undefined
 ): Promise<{ json: GltfJson; buffers: GltfBuffers }> {
   const bufferViews = json.bufferViews ?? [];
   const compressed = bufferViews
@@ -44,10 +62,14 @@ export async function decodeMeshoptBufferViews(
       'glTF: the file uses EXT_meshopt_compression; pass options.meshopt'
     );
   }
-  await decoder.ready;
   const patchedViews = [...bufferViews];
   const patchedBuffers = [...buffers];
-  for (const [index, bufferView] of compressed) {
+
+  const decodeEntry = async (
+    index: number,
+    bufferView: GltfBufferView,
+    decodeOne: DecodeOne
+  ): Promise<void> => {
     const ext = bufferView.extensions!.EXT_meshopt_compression!;
     const source = buffers[ext.buffer];
     if (!source) {
@@ -63,15 +85,16 @@ export async function decodeMeshoptBufferViews(
       );
     }
     const compressedBytes = source.subarray(start, end);
-    const target = new Uint8Array(ext.count * ext.byteStride);
-    decoder.decodeGltfBuffer(
-      target,
+    const target = await decodeOne(
       ext.count,
       ext.byteStride,
       compressedBytes,
       ext.mode,
       ext.filter
     );
+    // one synchronous step, so this is safe even when several bufferViews
+    // decode concurrently: whichever resolves first sees, and claims, the
+    // current length before anything else can run
     patchedViews[index] = {
       ...bufferView,
       buffer: patchedBuffers.length,
@@ -79,7 +102,36 @@ export async function decodeMeshoptBufferViews(
       byteLength: target.byteLength,
     };
     patchedBuffers.push(target);
+  };
+
+  if (isMeshoptWorkerOptions(decoder)) {
+    const pool = new MeshoptWorkerPool(decoder);
+    try {
+      await Promise.all(
+        compressed.map(([index, bufferView]) =>
+          decodeEntry(index, bufferView, (count, size, source, mode, filter) =>
+            pool.decode(count, size, source, mode, filter)
+          )
+        )
+      );
+    } finally {
+      pool.dispose();
+    }
+  } else {
+    await decoder.ready;
+    for (const [index, bufferView] of compressed) {
+      await decodeEntry(
+        index,
+        bufferView,
+        async (count, size, source, mode, filter) => {
+          const target = new Uint8Array(count * size);
+          decoder.decodeGltfBuffer(target, count, size, source, mode, filter);
+          return target;
+        }
+      );
+    }
   }
+
   return {
     json: { ...json, bufferViews: patchedViews },
     buffers: patchedBuffers,

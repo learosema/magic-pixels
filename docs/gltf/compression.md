@@ -91,15 +91,19 @@ global, `draco3d`'s `createDecoderModule()` result, or the CDN build's
 without the matching option throws an error naming the option, so the
 failure points straight at the fix.
 
-## Draco decoding runs off the main thread
+## Decoding runs off the main thread
 
-Meshopt's decode is a flat, branch-light byte expansion, cheap enough to
-run inline. Draco's Edgebreaker-style traversal is not: for a large mesh
-it can take tens of milliseconds, long enough to drop frames if it runs on
-the same thread as rendering. So `options.draco` has a second shape
-besides an initialized module - `{ decoderPath, workerLimit? }` - that
+Draco's Edgebreaker-style traversal can take tens of milliseconds for a
+large mesh, long enough to drop frames if it runs on the same thread as
+rendering. Meshopt's decode is individually much cheaper - a flat,
+branch-light byte expansion - but a file can carry many compressed
+bufferViews (one per attribute stream, plus indices), and decoding them
+one at a time still costs main-thread time that could instead overlap
+with everything else a load is doing (other bufferViews, images). So both
+`options.draco` and `options.meshopt` have a second shape besides an
+initialized module - `{ decoderPath | moduleUrl, workerLimit? }` - that
 decodes in a pool of Web Workers instead, the way three.js's `DRACOLoader`
-does:
+does for Draco:
 
 ```ts
 import { loadGltf } from 'magic-pixels';
@@ -108,30 +112,53 @@ const model = await loadGltf('model.glb', {
   draco: {
     decoderPath: 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/',
   },
+  meshopt: {
+    moduleUrl:
+      'https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs',
+  },
 });
 ```
 
-Each worker fetches and initializes the decoder script itself, from
-`decoderPath`, the first time it is asked to decode - magic-pixels itself
-still never bundles or fetches Draco. `DracoWorkerPool` spawns workers
-lazily, up to `workerLimit` (default 4), reused round-robin across the
-primitives that need decoding, and disposes them once the file's own
-loading finishes. Which shape `options.draco` has decides which path
-runs: an initialized module decodes synchronously, right there in
-`parseGltf`; a `decoderPath` decodes on a worker.
+Each worker fetches and initializes the decoder itself, from
+`decoderPath`/`moduleUrl`, the first time it is asked to decode -
+magic-pixels itself still never bundles or fetches either. `DracoWorkerPool`
+and `MeshoptWorkerPool` spawn workers lazily, up to `workerLimit` (default
+4), reused round-robin, and dispose them once the file's own loading
+finishes: for Draco that means once every primitive is decoded, for
+meshopt once every compressed bufferView is (dispatched with `Promise.all`,
+so several can decode concurrently across the pool rather than one after
+another). Which shape an option has decides which path runs: an
+initialized module decodes synchronously, right there in `parseGltf`; a
+`decoderPath`/`moduleUrl` decodes on a worker.
 
-The worker is a _classic_ script, not an ES module: the Draco decoder is
+Both workers are bundled as _classic_ scripts, not ES modules, and both
+for the same reason even though only one needs it: the Draco decoder is
 only published as a classic script that `importScripts()` pulls in, and
-module workers cannot call `importScripts()`. That is also why it ships
-as its own bundle (`dist/draco-worker.js`, built from a separate
-`build.js` entry point) rather than inside the library's main ESM bundle.
-The two sides exchange plain typed arrays over `postMessage`, not the
-`BufferAttribute`s the rest of the loader deals in - wrapping the result
-back into attributes happens on the main thread once it arrives. A
-bufferView's bytes are copied before being handed to a worker, because
-the transfer list that avoids a copy would otherwise detach the buffer
-from under every _other_ bufferView that shares it; the decoded result
-has no such sharing, so it comes back by transfer, not copy.
+module workers cannot call `importScripts()`. Meshopt's decoder _is_ a
+real ES module, loaded with a plain dynamic `import()` instead - which
+works in a classic script too, so `meshopt-worker.ts` can be built the
+same way as `draco-worker.ts` rather than needing a second worker
+"flavour". That is also why each ships as its own bundle
+(`dist/draco-worker.js`, `dist/meshopt-worker.js`, built from separate
+`build.js` entry points) rather than inside the library's main ESM
+bundle. Both pools exchange plain typed arrays over `postMessage`, not
+the `BufferAttribute`s the rest of the loader deals in - wrapping the
+result back into attributes (Draco) or a patched bufferView (meshopt)
+happens on the main thread once it arrives. A bufferView's bytes are
+copied before being handed to a worker, because the transfer list that
+avoids a copy would otherwise detach the buffer from under every _other_
+bufferView that shares it; the decoded result has no such sharing, so it
+comes back by transfer, not copy.
+
+The pooling mechanics - spawning up to a limit, round-robin reuse,
+correlating a response back to its request by id, terminating on dispose
+
+- are identical for both formats, so they share one `WorkerPool<Response>`
+  (`src/loaders/gltf/worker-pool.ts`). It knows nothing about Draco or
+  meshopt: it just moves a `{ id }`-tagged message to a worker and resolves
+  a promise when a `{ id }`-tagged response comes back, leaving what the
+  message contains, and what a "successful" response looks like, entirely
+  to `DracoWorkerPool`/`MeshoptWorkerPool`.
 
 The two extensions also compress differently shaped things, which shows
 up in where the loader hooks in:
@@ -153,15 +180,27 @@ up in where the loader hooks in:
 
 ## File by file
 
+- `src/loaders/gltf/worker-pool.ts`: `WorkerPool<Response>`, the pooling
+  primitive both compression formats share - spawn up to `workerLimit`,
+  round-robin reuse, `send()`/correlate by id, `dispose()`. Generic over
+  the response shape; format-specific request building and result
+  unwrapping live in `DracoWorkerPool`/`MeshoptWorkerPool` instead.
 - `src/loaders/gltf/meshopt.ts`: `decodeMeshoptBufferViews(json, buffers, decoder)`.
   A pure function - it changes nothing in place - that finds every
-  bufferView carrying `EXT_meshopt_compression`, decodes its bytes with
-  `decoder.decodeGltfBuffer(target, count, size, source, mode, filter)`
-  and returns a patched `json`/`buffers` pair with those bufferViews
-  redirected at the decoded bytes. A meshopt-compressed buffer set also
-  includes a data-less "fallback" buffer (present only for bookkeeping;
-  every real bufferView is always redirected by its own extension), which
-  the loader recognises and skips rather than trying to fetch.
+  bufferView carrying `EXT_meshopt_compression` and decodes each one
+  (sequentially for a plain `MeshoptDecoder`, concurrently via
+  `MeshoptWorkerPool` for `{ moduleUrl }`) with
+  `decodeGltfBuffer(target, count, size, source, mode, filter)`, returning
+  a patched `json`/`buffers` pair with those bufferViews redirected at the
+  decoded bytes. A meshopt-compressed buffer set also includes a data-less
+  "fallback" buffer (present only for bookkeeping; every real bufferView
+  is always redirected by its own extension), which the loader recognises
+  and skips rather than trying to fetch.
+- `src/loaders/gltf/meshopt-worker-protocol.ts` / `meshopt-worker.ts` /
+  `meshopt-worker-pool.ts`: the same three-way split as Draco's below -
+  message shapes, the worker's entry point (`import()`s the decoder
+  module from `moduleUrl`, caches one module promise per URL), and
+  `MeshoptWorkerPool`/`MeshoptWorkerOptions` built on `WorkerPool`.
 - `src/loaders/gltf/draco.ts`: `extractDracoRequest(json, primitive, ext, buffers)`
   resolves a primitive's compressed bufferView and its attributes' shape
   (`componentType`, `type`, `normalized`) into a self-contained
@@ -182,27 +221,31 @@ up in where the loader hooks in:
   separately (see below). Caches one decoder module promise per
   `decoderPath`, calls `decodeDraco()` on each `decode` message, and
   transfers the result's typed arrays back rather than copying them.
-- `src/loaders/gltf/draco-worker-pool.ts`: `DracoWorkerPool`, `DracoWorkerOptions`.
-  Spawns `Worker`s lazily up to `workerLimit`, copies a request's bytes
-  before transferring them, and correlates responses back to callers by
-  a per-request id.
+- `src/loaders/gltf/draco-worker-pool.ts`: `DracoWorkerPool`, `DracoWorkerOptions`,
+  built on `WorkerPool`. Copies a request's bytes before transferring
+  them; unwraps a `'decoded'` response into `DracoResult`, throws for an
+  `'error'` one.
 - `src/loaders/gltf/loader.ts`: `GltfLoaderOptions.meshopt`/`.draco`
-  (`DracoDecoderModule | DracoWorkerOptions`, told apart by whether
-  `decoderPath` is present); `parse()` calls `decodeMeshoptBufferViews()`
-  right after the buffers are loaded and keeps the _original_,
-  un-patched document as `result.json` even though the patched one is
-  what accessors actually read from; `loadPrimitive()` branches to
-  `decodeDracoPrimitive()` or a lazily-created `DracoWorkerPool`
-  depending on which shape `options.draco` has, and the pool is disposed
-  once `parse()` returns. Both extensions were added to
-  `SUPPORTED_EXTENSIONS`, so a file that requires one passes the early
-  extension check and fails later with the more specific "pass
-  options.meshopt/options.draco" error instead.
-- `build.js`: a second `esbuild` entry point bundles `draco-worker.ts` to
-  `dist/draco-worker.js` in the `iife` format a classic worker needs,
-  exposed as the `magic-pixels/draco-worker` export - not imported
-  directly, but `DracoWorkerPool` resolves it as a URL next to its own
-  module with `new URL('./draco-worker.js', import.meta.url)`.
+  (each `<Decoder> | <WorkerOptions>`, told apart by whether
+  `decoderPath`/`moduleUrl` is present); `parse()` calls
+  `decodeMeshoptBufferViews()` right after the buffers are loaded and
+  keeps the _original_, un-patched document as `result.json` even though
+  the patched one is what accessors actually read from; `loadPrimitive()`
+  branches to `decodeDracoPrimitive()` or a lazily-created
+  `DracoWorkerPool` depending on which shape `options.draco` has, and the
+  pool is disposed once `parse()` returns (meshopt's own pool, scoped to
+  one `decodeMeshoptBufferViews()` call, is disposed there instead - the
+  whole document's compressed bufferViews are known up front, unlike
+  Draco's per-primitive decoding spread across the parse). Both
+  extensions were added to `SUPPORTED_EXTENSIONS`, so a file that
+  requires one passes the early extension check and fails later with the
+  more specific "pass options.meshopt/options.draco" error instead.
+- `build.js`: two extra `esbuild` entry points bundle `draco-worker.ts`
+  and `meshopt-worker.ts` to `dist/draco-worker.js` / `dist/meshopt-worker.js`
+  in the `iife` format a classic worker needs, exposed as the
+  `magic-pixels/draco-worker` / `magic-pixels/meshopt-worker` exports -
+  not imported directly, but each pool resolves its worker as a URL next
+  to its own module, e.g. `new URL('./draco-worker.js', import.meta.url)`.
 - `src/loaders/gltf/types.ts`: `GltfMeshoptCompression` (a bufferView's
   extension object) and `GltfDracoMeshCompression` (a primitive's).
 - `src/loaders/gltf/fixtures/`: `quantized()` (a `KHR_mesh_quantization`
@@ -213,19 +256,20 @@ up in where the loader hooks in:
   `dracoCompressed()` and `draco-stub.ts`'s `createDracoStub()` (a stub
   Draco module implementing just the calls `decodeDraco` makes, backed by
   a fixed decoded mesh instead of a real `.drc` bitstream), and
-  `draco-worker-stub.ts`'s `createFakeDracoWorkerClass()` (a fake
-  `Worker` that decodes with the same stub module, round-tripped through
-  `postMessage`/`onmessage` so `DracoWorkerPool`'s tests exercise the
-  real protocol without a real thread).
+  `draco-worker-stub.ts`'s / `meshopt-worker-stub.ts`'s
+  `createFakeDracoWorkerClass()` / `createFakeMeshoptWorkerClass()` (a
+  fake `Worker` that decodes with the same stub logic as the synchronous
+  tests, round-tripped through `postMessage`/`onmessage` so each pool's
+  tests exercise the real protocol without a real thread).
 
 ## Try it
 
 The [glTF loader example](https://learosema.github.io/magic-pixels/examples/10-gltf-loader/)
-loads `meshoptimizer` as an ES module on the main thread and decodes Draco
-in a worker pool (`draco: { decoderPath }`), and its model list has two
-compressed entries - a box compressed with `gltfpack -cc` and the
-Khronos sample box Draco-compressed - embedded directly in the page so
-the demo needs no server for them. Things to change:
+decodes both formats in a worker pool (`draco: { decoderPath }`,
+`meshopt: { moduleUrl }`), and its model list has two compressed entries -
+a box compressed with `gltfpack -cc` and the Khronos sample box
+Draco-compressed - embedded directly in the page so the demo needs no
+server for them. Things to change:
 
 - Pass a URL of your own: the demo's `sample()` helper wraps
   `loadGltf(url)`; point it at any `EXT_meshopt_compression` file (run
@@ -240,10 +284,10 @@ the demo needs no server for them. Things to change:
   quantization, but the ratio grows with mesh size.
 - Drop a compressed file that needs no decoder you have not passed: the
   loader's error names the missing option instead of failing to parse.
-- Watch the worker do the work: open the browser's task manager (or the
-  performance panel) while loading a large `KHR_draco_mesh_compression`
-  model, and the decode shows up on a separate `draco-worker.js` thread
-  instead of blocking the page.
+- Watch the workers do the work: open the browser's task manager (or the
+  performance panel) while loading a large compressed model, and the
+  decode shows up on separate `draco-worker.js`/`meshopt-worker.js`
+  threads instead of blocking the page.
 
 ## Further reading
 
@@ -263,4 +307,4 @@ the demo needs no server for them. Things to change:
   another implementation of the same Draco decode path and worker pool.
 - [MDN: Using Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers):
   the classic-vs-module worker distinction and `postMessage`'s transfer
-  list, both of which `DracoWorkerPool` relies on.
+  list, both of which `WorkerPool` relies on.

@@ -7,3 +7,4 @@ coverage
 site
 examples/magic-pixels.js
 examples/draco-worker.js
+examples/meshopt-worker.js
