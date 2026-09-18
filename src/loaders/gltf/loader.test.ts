@@ -31,6 +31,7 @@ import {
   camerasAndLights,
   createDracoStub,
   createFakeDracoWorkerClass,
+  createFakeMeshoptWorkerClass,
   dracoCompressed,
   dracoCompressedPointCountMismatch,
   dracoCompressedWithTangent,
@@ -688,6 +689,29 @@ describe('compression', () => {
     await expect(parseGltf(meshoptCompressed())).rejects.toThrow(
       /options\.meshopt/
     );
+  });
+
+  test('EXT_meshopt_compression decodes through a worker pool given { moduleUrl }', async () => {
+    const { FakeWorker, calls } = createFakeMeshoptWorkerClass();
+    vi.stubGlobal('Worker', FakeWorker);
+    try {
+      const document = meshoptCompressed();
+      const result = await parseGltf(document, {
+        meshopt: { moduleUrl: 'https://example.test/meshopt_decoder.mjs' },
+      });
+      const { geometry } = result.scene.children[0] as Mesh;
+
+      expect(Array.from(geometry.attributes.position.data)).toEqual([
+        0, 0, 0, 1, 0, 0, 0, 1, 0,
+      ]);
+      expect(Array.from(geometry.index!)).toEqual([0, 1, 2]);
+      // one worker for the default workerLimit, all three bufferViews
+      // decoded on it; the pool is disposed once decoding finishes
+      expect(calls.constructed).toBeGreaterThan(0);
+      expect(calls.terminated).toBe(calls.constructed);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   test('KHR_draco_mesh_compression decodes attributes and indices, and frees every object', async () => {

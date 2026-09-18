@@ -3,6 +3,7 @@ import type {
   DracoWorkerRequest,
   DracoWorkerResponse,
 } from './draco-worker-protocol';
+import { WorkerPool } from './worker-pool';
 
 /**
  * Runs `KHR_draco_mesh_compression` decoding in a pool of Web Workers
@@ -20,26 +21,18 @@ export type DracoWorkerOptions = {
 };
 
 export class DracoWorkerPool {
-  private readonly workers: Worker[] = [];
-  private nextWorker = 0;
-  private nextId = 1;
-  private readonly pending = new Map<
-    number,
-    { resolve: (result: DracoResult) => void; reject: (error: Error) => void }
-  >();
+  private readonly pool: WorkerPool<DracoWorkerResponse>;
 
   constructor(
     private readonly options: DracoWorkerOptions,
-    private readonly workerUrl: string | URL = new URL(
-      './draco-worker.js',
-      import.meta.url
-    )
-  ) {}
+    workerUrl: string | URL = new URL('./draco-worker.js', import.meta.url)
+  ) {
+    this.pool = new WorkerPool(workerUrl, { workerLimit: options.workerLimit });
+  }
 
   /** Decode one primitive on the next available worker */
-  decode(request: DracoRequest): Promise<DracoResult> {
-    const worker = this.getWorker();
-    const id = this.nextId++;
+  async decode(request: DracoRequest): Promise<DracoResult> {
+    const id = this.pool.nextRequestId();
     // a fresh, exclusively-owned copy: `request.bytes` is a view into a
     // buffer shared with other bufferViews of the same glTF file, which
     // `postMessage`'s transfer list would otherwise detach from under them
@@ -52,59 +45,15 @@ export class DracoWorkerPool {
       attributes: request.attributes,
       indexComponentType: request.indexComponentType,
     };
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      worker.postMessage(message, [bytes.buffer]);
-    });
+    const response = await this.pool.send(message, [bytes.buffer]);
+    if (response.type === 'error') {
+      throw Error(response.message);
+    }
+    return { attributes: response.attributes, indices: response.indices };
   }
 
   /** Terminate every spawned worker; further `decode()` calls spawn fresh ones */
   dispose(): void {
-    for (const worker of this.workers) {
-      worker.terminate();
-    }
-    this.workers.length = 0;
-    this.nextWorker = 0;
-    this.pending.clear();
-  }
-
-  private getWorker(): Worker {
-    const limit = this.options.workerLimit ?? 4;
-    if (this.workers.length < limit) {
-      const worker = new Worker(this.workerUrl);
-      worker.onmessage = (event: MessageEvent<DracoWorkerResponse>) =>
-        this.handleMessage(event.data);
-      worker.onerror = (event: ErrorEvent) => this.handleFatal(event);
-      this.workers.push(worker);
-      return worker;
-    }
-    const worker = this.workers[this.nextWorker];
-    this.nextWorker = (this.nextWorker + 1) % this.workers.length;
-    return worker;
-  }
-
-  private handleMessage(response: DracoWorkerResponse): void {
-    const pending = this.pending.get(response.id);
-    if (!pending) {
-      return;
-    }
-    this.pending.delete(response.id);
-    if (response.type === 'error') {
-      pending.reject(Error(response.message));
-    } else {
-      pending.resolve({
-        attributes: response.attributes,
-        indices: response.indices,
-      });
-    }
-  }
-
-  /** A worker itself failed (e.g. `decoderPath` is wrong): fail every request in flight */
-  private handleFatal(event: ErrorEvent): void {
-    const error = Error(`glTF: Draco worker error: ${event.message}`);
-    for (const pending of this.pending.values()) {
-      pending.reject(error);
-    }
-    this.pending.clear();
+    this.pool.dispose();
   }
 }

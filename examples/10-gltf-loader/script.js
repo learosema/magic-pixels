@@ -18,12 +18,11 @@ import {
 const SAMPLES =
   'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 // Every load (a sample, a dropped file, or one of the two embedded
-// models below) gets both decoders: they only do anything for a
-// file that actually carries the matching extension, and Draco's
-// module is memoized, so this is not a decoder-per-file cost.
+// models below) gets both decoder options: they only do anything for a
+// file that actually carries the matching extension.
 const sample = (name, path) => ({
   name,
-  load: async () => loadGltf(SAMPLES + path, await decoderOptions()),
+  load: () => loadGltf(SAMPLES + path, decoderOptions()),
 });
 
 // A tiny box, quantized and compressed with `gltfpack -cc`
@@ -111,33 +110,27 @@ const DRACO_BOX_JSON = {
   extensionsUsed: ['KHR_draco_mesh_compression'],
 };
 
-// `options.draco` as a `{ decoderPath }` decodes in a pool of Web
-// Workers instead of blocking the main thread: each worker fetches
-// the decoder script from this URL and initializes it itself, once,
-// the first time it is asked to decode. The same object is reused
-// for every load below; magic-pixels spawns and disposes the actual
-// workers per `parseGltf`/`loadGltf` call.
+// Both `options.draco` and `options.meshopt` decode in a pool of Web
+// Workers instead of blocking the main thread, given a `{ decoderPath }`
+// / `{ moduleUrl }` instead of an already-initialized decoder: each
+// worker fetches and initializes the decoder itself, once, the first
+// time it is asked to decode. Both objects are reused for every load
+// below; magic-pixels spawns and disposes the actual workers per
+// `parseGltf`/`loadGltf` call.
 const DRACO_OPTIONS = {
   decoderPath: 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/',
 };
-
-// Most sample models aren't meshopt-compressed, so the module is
-// only fetched on first use.
-let meshoptModulePromise;
-function meshoptModule() {
-  meshoptModulePromise ??=
-    import('https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs').then(
-      (m) => m.MeshoptDecoder
-    );
-  return meshoptModulePromise;
-}
+const MESHOPT_OPTIONS = {
+  moduleUrl:
+    'https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs',
+};
 
 // The loader options every load below passes: it only decodes a
 // bufferView or primitive that actually carries the matching
 // extension, so passing both unconditionally is what lets any
 // sample, drop, or embedded model "just work".
-async function decoderOptions() {
-  return { meshopt: await meshoptModule(), draco: DRACO_OPTIONS };
+function decoderOptions() {
+  return { meshopt: MESHOPT_OPTIONS, draco: DRACO_OPTIONS };
 }
 
 const MODELS = [
@@ -166,7 +159,7 @@ const MODELS = [
       const bytes = Uint8Array.from(atob(MESHOPT_BOX_GLB), (c) =>
         c.charCodeAt(0)
       );
-      return parseGltf(bytes, { meshopt: await meshoptModule() });
+      return parseGltf(bytes, { meshopt: MESHOPT_OPTIONS });
     },
   },
   {
@@ -340,9 +333,7 @@ function showDropped(files) {
       ? new Response(file)
       : new Response(null, { status: 404, statusText: 'not dropped' });
   };
-  show(main.name, async () =>
-    loadGltf(main.name, { fetch, ...(await decoderOptions()) })
-  );
+  show(main.name, () => loadGltf(main.name, { fetch, ...decoderOptions() }));
 }
 // A browser only allows a drop once `dragenter` is cancelled, not
 // only `dragover`; without this listener some browsers silently

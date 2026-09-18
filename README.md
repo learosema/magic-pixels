@@ -262,12 +262,13 @@ model.json; // the parsed document, for anything not mapped
 text or bytes of a `.gltf`, or its parsed JSON. Both take options: `baseUrl` (what relative URIs
 resolve against), `fetch` (defaults to the global one; pass your own to load from memory or to
 add headers), `loadImage` (how images are decoded; defaults to `createImageBitmap`), `meshopt`
-(a decoder for `EXT_meshopt_compression`, exactly the shape of `MeshoptDecoder` from the
-`meshoptimizer` package) and `draco` (for `KHR_draco_mesh_compression`, either a decoder module -
-the result of `createDecoderModule()` from `draco3d`, or the CDN build's `DracoDecoderModule` -
-decoded on the main thread, or `{ decoderPath, workerLimit? }` to decode in a pool of Web Workers
-instead, the way three.js's `DRACOLoader` does). Neither decoder is bundled by magic-pixels; a
-file that uses one of these extensions without the matching option throws, naming it.
+(for `EXT_meshopt_compression`) and `draco` (for `KHR_draco_mesh_compression`). Both accept
+either an already-initialized decoder module, decoded on the main thread - `meshopt` the shape
+of `MeshoptDecoder` from the `meshoptimizer` package, `draco` the result of
+`createDecoderModule()` from `draco3d` or the CDN build's `DracoDecoderModule` - or a
+`{ moduleUrl | decoderPath, workerLimit? }` to decode in a pool of Web Workers instead, the way
+three.js's `DRACOLoader` does. Neither decoder is bundled by magic-pixels; a file that uses one
+of these extensions without the matching option throws, naming it.
 
 ```js
 const model = await parseGltf(arrayBuffer, {

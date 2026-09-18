@@ -69,12 +69,12 @@
     </div>
     <!--
       Neither decoder is bundled with magic-pixels: both are options the
-      loader accepts, never a dependency. Draco decoding runs in a pool of
-      workers (`options.draco = { decoderPath }`); each worker fetches and
-      `importScripts()`s the classic (non-module) decoder script itself the
-      first time it is asked to decode. meshopt's decoder is a real ES
-      module, imported lazily on the main thread below. Most sample models
-      need neither, so this hint just warms the HTTP cache in idle time so
+      loader accepts, never a dependency, and both decode in a pool of
+      workers (`options.draco = { decoderPath }`, `options.meshopt =
+      { moduleUrl }`) instead of blocking the main thread - each worker
+      fetches and initializes the actual decoder itself, from that URL,
+      the first time it is asked to decode. Most sample models need
+      neither, so these hints just warm the HTTP cache in idle time so
       first use doesn't pay the fetch latency.
     -->
     <link
@@ -83,7 +83,8 @@
       href="https://www.gstatic.com/draco/versioned/decoders/1.5.7/draco_decoder.js"
     />
     <link
-      rel="modulepreload"
+      rel="prefetch"
+      as="script"
       href="https://cdn.jsdelivr.net/npm/meshoptimizer@1.2.0/meshopt_decoder.mjs"
     />
     <script type="module" src="./script.js"></script>
