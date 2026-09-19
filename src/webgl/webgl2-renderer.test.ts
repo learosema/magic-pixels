@@ -12,8 +12,10 @@ import { Object3D } from '../scene/object3d';
 import { Scene } from '../scene/scene';
 import { PerspectiveCamera } from '../scene/camera';
 import { Texture } from '../scene/texture';
+import { RenderTarget } from '../scene/render-target';
 import {
   ColorSpace,
+  DepthAttachment,
   DrawMode,
   Filter,
   Side,
@@ -903,6 +905,206 @@ void main() { gl_Position = projectionMatrix * vec4(position, 1.0); }`;
         ([name]) => name === 'ambientLightColor'
       );
       expect(ambient).toEqual([['ambientLightColor', [1, 1, 1]]]);
+    });
+  });
+
+  describe('render targets', () => {
+    const scene = new Scene();
+    const camera = new PerspectiveCamera();
+
+    test('creates a framebuffer with a colour attachment on first render', () => {
+      const target = new RenderTarget(64, 32);
+      renderer.render(scene, camera, target);
+
+      expect(gl.created.framebuffers).toBe(1);
+      expect(gl.callsTo('framebufferTexture2D')[0].args).toEqual([
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        expect.anything(),
+        0,
+      ]);
+      expect(gl.callsTo('texImage2D')[0].args).toEqual([
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA8,
+        64,
+        32,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null,
+      ]);
+      expect(target.colorAttachment.needsUpdate).toBe(false);
+    });
+
+    test('reuses the framebuffer on later renders', () => {
+      const target = new RenderTarget(64, 32);
+      renderer.render(scene, camera, target);
+      renderer.render(scene, camera, target);
+
+      expect(gl.created.framebuffers).toBe(1);
+      expect(gl.created.textures).toBe(1);
+    });
+
+    test('binds the framebuffer and sizes the viewport, then restores the canvas', () => {
+      const target = new RenderTarget(64, 32);
+      renderer.render(scene, camera, target);
+
+      const binds = gl.callsTo('bindFramebuffer').map(({ args }) => args[1]);
+      expect(binds.at(-1)).toBeNull();
+      expect(binds.at(-2)).not.toBeNull();
+      const viewports = gl.callsTo('viewport').map(({ args }) => args);
+      expect(viewports).toEqual([
+        [0, 0, 64, 32],
+        [0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight],
+      ]);
+    });
+
+    test('rendering without a target draws to the default framebuffer', () => {
+      renderer.render(scene, camera);
+
+      expect(gl.callsTo('bindFramebuffer').map(({ args }) => args[1])).toEqual([
+        null,
+      ]);
+    });
+
+    test('uses a depth renderbuffer by default', () => {
+      renderer.render(scene, camera, new RenderTarget(8, 8));
+
+      expect(gl.created.renderbuffers).toBe(1);
+      expect(gl.callsTo('renderbufferStorage')[0].args).toEqual([
+        gl.RENDERBUFFER,
+        gl.DEPTH_COMPONENT24,
+        8,
+        8,
+      ]);
+      expect(gl.callsTo('framebufferRenderbuffer')[0].args[1]).toBe(
+        gl.DEPTH_ATTACHMENT
+      );
+    });
+
+    test('depth: texture attaches a sampleable depth texture', () => {
+      const target = new RenderTarget(8, 8, { depth: DepthAttachment.TEXTURE });
+      renderer.render(scene, camera, target);
+
+      expect(gl.created.renderbuffers).toBe(0);
+      expect(gl.created.textures).toBe(2);
+      expect(gl.callsTo('framebufferTexture2D')[1].args[1]).toBe(
+        gl.DEPTH_ATTACHMENT
+      );
+      expect(gl.callsTo('texImage2D')[1].args[2]).toBe(gl.DEPTH_COMPONENT24);
+      expect(target.depthAttachment?.needsUpdate).toBe(false);
+    });
+
+    test('depth: none attaches no depth buffer', () => {
+      const target = new RenderTarget(8, 8, { depth: DepthAttachment.NONE });
+      renderer.render(scene, camera, target);
+
+      expect(gl.created.renderbuffers).toBe(0);
+      expect(gl.callsTo('framebufferRenderbuffer')).toHaveLength(0);
+      expect(gl.callsTo('framebufferTexture2D')).toHaveLength(1);
+    });
+
+    test('float targets use a half float colour format', () => {
+      renderer.render(scene, camera, new RenderTarget(8, 8, { float: true }));
+
+      const [, , internalFormat, , , , , type] =
+        gl.callsTo('texImage2D')[0].args;
+      expect(internalFormat).toBe(gl.RGBA16F);
+      expect(type).toBe(gl.HALF_FLOAT);
+    });
+
+    test('float targets throw without EXT_color_buffer_float', () => {
+      gl.removeExtensions('EXT_color_buffer_float');
+
+      expect(() =>
+        renderer.render(scene, camera, new RenderTarget(8, 8, { float: true }))
+      ).toThrow(/EXT_color_buffer_float/);
+      expect(gl.created.framebuffers).toBe(0);
+    });
+
+    test('throws when the framebuffer is incomplete', () => {
+      gl.checkFramebufferStatus = () => 0;
+
+      expect(() =>
+        renderer.render(scene, camera, new RenderTarget(8, 8))
+      ).toThrow(/incomplete/);
+    });
+
+    test('rebuilds the framebuffer at the new size when the target is resized', () => {
+      const target = new RenderTarget(8, 8);
+      renderer.render(scene, camera, target);
+      target.width = 16;
+      target.height = 4;
+      renderer.render(scene, camera, target);
+
+      expect(gl.created.framebuffers).toBe(2);
+      expect(gl.deleted.framebuffers).toBe(1);
+      expect(gl.deleted.renderbuffers).toBe(1);
+      expect(gl.deleted.textures).toBe(1);
+      expect(gl.callsTo('texImage2D')[1].args.slice(3, 5)).toEqual([16, 4]);
+      expect(gl.callsTo('viewport')[2].args).toEqual([0, 0, 16, 4]);
+    });
+
+    test('a material using the colour attachment binds the rendered texture', () => {
+      const target = new RenderTarget(8, 8);
+      renderer.render(scene, camera, target);
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
+        map: target.colorAttachment,
+      });
+      draw(new Mesh(createTriangle(), material));
+
+      // no second texture, and the empty placeholder is never uploaded
+      expect(gl.created.textures).toBe(1);
+      expect(gl.callsTo('texImage2D')).toHaveLength(1);
+    });
+
+    test('a target sampled before its first render allocates empty storage, replaced later', () => {
+      const target = new RenderTarget(8, 4);
+      const material = createShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER, {
+        map: target.colorAttachment,
+      });
+      draw(new Mesh(createTriangle(), material));
+
+      // zeros of the right size, not an upload of the placeholder image
+      expect(gl.created.textures).toBe(1);
+      const [, , internalFormat, width, height, , , , data] =
+        gl.callsTo('texImage2D')[0].args;
+      expect([internalFormat, width, height, data]).toEqual([
+        gl.RGBA8,
+        8,
+        4,
+        null,
+      ]);
+
+      // rendering into the target later swaps in the framebuffer's texture
+      renderer.render(scene, camera, target);
+      expect(gl.created.textures).toBe(2);
+      expect(gl.deleted.textures).toBe(1);
+    });
+
+    test('dispose(target) frees the framebuffer, renderbuffer and textures', () => {
+      const target = new RenderTarget(8, 8, { depth: DepthAttachment.TEXTURE });
+      renderer.render(scene, camera, target);
+      renderer.dispose(target);
+
+      expect(gl.deleted.framebuffers).toBe(1);
+      expect(gl.deleted.textures).toBe(2);
+
+      const renderbufferTarget = new RenderTarget(8, 8);
+      renderer.render(scene, camera, renderbufferTarget);
+      renderer.dispose(renderbufferTarget);
+      expect(gl.deleted.renderbuffers).toBe(1);
+    });
+
+    test('dispose() frees render targets too', () => {
+      renderer.render(scene, camera, new RenderTarget(8, 8));
+      renderer.dispose();
+
+      expect(gl.deleted.framebuffers).toBe(1);
+      expect(gl.deleted.renderbuffers).toBe(1);
+      expect(gl.deleted.textures).toBe(1);
     });
   });
 });

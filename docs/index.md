@@ -3,6 +3,7 @@ title: Guides
 children:
   - ./core/index.md
   - ./gltf/index.md
+  - ./rendering/index.md
 ---
 
 # The magic pixels book
@@ -33,6 +34,12 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [Loader core](./gltf/loader-core.md)
 - [Bounding volumes](./gltf/bounding-volumes.md)
 - [Compression](./gltf/compression.md)
+
+## Chapter 3: Rendering to textures
+
+- [Rendering to textures](./rendering/index.md)
+- [Render targets](./rendering/render-targets.md)
+- [Tone mapping](./rendering/tone-mapping.md)
 
 ## Reading list
 

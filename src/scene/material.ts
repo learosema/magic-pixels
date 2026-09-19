@@ -1,7 +1,7 @@
 import { Texture } from './texture';
 import type { Vector, Matrix, Mat2, Mat3, Mat4 } from '../utils';
 import { Color } from '../utils';
-import { AlphaMode, DrawMode, Side } from './constants';
+import { AlphaMode, DrawMode, Side, ToneMapping } from './constants';
 
 import defaultVertexShader from '../shaders/default.vert';
 import defaultFragmentShader from '../shaders/default.frag';
@@ -9,6 +9,8 @@ import basicFragmentShader from '../shaders/basic.frag';
 import normalFragmentShader from '../shaders/normal.frag';
 import pbrVertexShader from '../shaders/pbr.vert';
 import pbrFragmentShader from '../shaders/pbr.frag';
+import fullscreenVertexShader from '../shaders/fullscreen.vert';
+import tonemapFragmentShader from '../shaders/tonemap.frag';
 
 export type Uniform =
   | number
@@ -160,6 +162,12 @@ export type PbrMaterialOptions = {
   doubleSided?: boolean;
   /** base colour only, no lighting (glTF's `KHR_materials_unlit`) */
   unlit?: boolean;
+  /**
+   * Write the linear colour as it is instead of converting it to sRGB.
+   * For a material drawn into a render target that a later pass (see
+   * {@link createToneMapMaterial}) tone maps and converts. Default `false`.
+   */
+  linearOutput?: boolean;
   /** multiply the base colour by the `color` vertex attribute (vec3 or vec4) */
   vertexColors?: boolean;
   /**
@@ -282,6 +290,9 @@ export function createPbrMaterial(options: PbrMaterialOptions = {}): Material {
   if (options.unlit) {
     defines.push('UNLIT');
   }
+  if (options.linearOutput) {
+    defines.push('LINEAR_OUTPUT');
+  }
   defines.push(
     `MAX_DIRECTIONAL_LIGHTS ${options.maxDirectionalLights ?? 4}`,
     `MAX_POINT_LIGHTS ${options.maxPointLights ?? 4}`
@@ -297,4 +308,60 @@ export function createPbrMaterial(options: PbrMaterialOptions = {}): Material {
     transparent: alphaMode === AlphaMode.BLEND,
     side: doubleSided ? Side.DOUBLE : Side.FRONT,
   };
+}
+
+/**
+ * A material for a fullscreen pass: the vertex shader draws the triangle of
+ * {@link createFullscreenMesh} across the whole screen and passes `vUv`
+ * (`0..1` across the screen) to the fragment shader, which is where the
+ * pass does its work, typically by sampling a {@link RenderTarget}'s colour
+ * texture. Depth testing and depth writes are off: a pass just overwrites
+ * every pixel.
+ * @param fragmentShader GLSL fragment shader reading `in vec2 vUv`
+ * @param uniforms the shader's uniforms, e.g. `{ map: target.colorAttachment }`
+ */
+export function createFullscreenMaterial(
+  fragmentShader: string,
+  uniforms: Uniforms = {}
+): Material {
+  return {
+    ...createShaderMaterial(fullscreenVertexShader, fragmentShader, uniforms),
+    depthTest: false,
+    depthWrite: false,
+  };
+}
+
+/** Options of {@link createToneMapMaterial} */
+export type ToneMapMaterialOptions = {
+  /** the linear HDR colour to tone map, usually a render target's colour */
+  map: Texture;
+  /** multiplied into the colour before the curve, default `1` */
+  exposure?: number;
+  /** the curve, default `'aces'` */
+  toneMapping?: ToneMapping;
+};
+
+/**
+ * A fullscreen pass material that reads linear HDR colour from `map`,
+ * multiplies it by `exposure`, tone maps it and converts it to sRGB: the
+ * last step between a scene rendered into a linear render target (PBR
+ * materials with `linearOutput`) and the canvas. `exposure` is an ordinary
+ * uniform, `material.uniforms.exposure = 2` brightens the picture by a
+ * stop. The curve is baked into the shader source; changing it means
+ * creating a new material.
+ */
+export function createToneMapMaterial(
+  options: ToneMapMaterialOptions
+): Material {
+  const toneMapping = options.toneMapping ?? ToneMapping.ACES;
+  const defines: string[] = [];
+  if (toneMapping === ToneMapping.ACES) {
+    defines.push('TONE_MAPPING_ACES');
+  } else if (toneMapping === ToneMapping.REINHARD) {
+    defines.push('TONE_MAPPING_REINHARD');
+  }
+  return createFullscreenMaterial(withDefines(tonemapFragmentShader, defines), {
+    map: options.map,
+    exposure: options.exposure ?? 1,
+  });
 }

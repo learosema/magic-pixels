@@ -5,6 +5,7 @@ import {
   DrawMode,
   Filter,
   Side,
+  ToneMapping,
   Wrapping,
   usesMipmaps,
 } from './constants';
@@ -16,6 +17,7 @@ import { Object3D } from './object3d';
 import { Scene } from './scene';
 import { Camera, PerspectiveCamera, OrthographicCamera } from './camera';
 import { Mesh } from './mesh';
+import { createFullscreenMesh } from './fullscreen';
 import { Light, AmbientLight, DirectionalLight, PointLight } from './light';
 import {
   createDefaultMaterial,
@@ -23,12 +25,15 @@ import {
   createNormalMaterial,
   createShaderMaterial,
   createPbrMaterial,
+  createFullscreenMaterial,
+  createToneMapMaterial,
 } from './material';
 import type {
   Material,
   PbrMap,
   PbrMaterialOptions,
   ShaderSource,
+  ToneMapMaterialOptions,
   Uniform,
   Uniforms,
 } from './material';
@@ -46,6 +51,7 @@ export type {
   PbrMap,
   PbrMaterialOptions,
   ShaderSource,
+  ToneMapMaterialOptions,
   Uniform,
   Uniforms,
   Renderer,
@@ -77,7 +83,11 @@ export {
   DepthAttachment,
   Side,
   AlphaMode,
+  ToneMapping,
   usesMipmaps,
+  createFullscreenMesh,
+  createFullscreenMaterial,
+  createToneMapMaterial,
   createDefaultMaterial,
   createBasicMaterial,
   createNormalMaterial,

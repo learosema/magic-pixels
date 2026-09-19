@@ -53,6 +53,19 @@ export const DepthAttachment = {
 export type DepthAttachment =
   (typeof DepthAttachment)[keyof typeof DepthAttachment];
 
+/**
+ * How a tone-mapping pass squeezes unbounded linear HDR values into the
+ * `0..1` range of a display: `'none'` just clamps, `'reinhard'` is the
+ * simple `c / (1 + c)` curve, `'aces'` is a filmic curve that keeps
+ * contrast in the mid tones and rolls the highlights off.
+ */
+export const ToneMapping = {
+  NONE: 'none',
+  REINHARD: 'reinhard',
+  ACES: 'aces',
+} as const;
+export type ToneMapping = (typeof ToneMapping)[keyof typeof ToneMapping];
+
 export const ColorSpace = {
   LINEAR: 'linear',
   SRGB: 'srgb',

@@ -162,6 +162,39 @@
           compressed model.
         </p>
       </li>
+      <li>
+        <a href="11-render-targets/">Render targets</a>
+        <p>
+          A PBR scene lit brighter than a display can show, rendered into a
+          floating point <code>RenderTarget</code> and tone mapped to the canvas
+          by a fullscreen pass, with a choice of curve and an exposure slider.
+        </p>
+      </li>
+      <li>
+        <a href="12-feedback-visualizer/">Feedback visualizer</a>
+        <p>
+          A Winamp-style trail effect: a noise curve is drawn into a render
+          target, blurred and faded into a second one by a fullscreen pass, and
+          drawn over again, with the two targets swapping roles every frame.
+        </p>
+      </li>
+      <li>
+        <a href="13-depth-texture/">Depth texture</a>
+        <p>
+          A scene drawn into a <code>RenderTarget</code> with
+          <code>depth: 'texture'</code>, then shown as colour and depth side by
+          side, with the depth either raw or linearized back to distance.
+        </p>
+      </li>
+      <li>
+        <a href="14-depth-of-field/">Depth of field</a>
+        <p>
+          A night street of very bright lamps drawn into a float target with a
+          depth texture; a fullscreen pass blurs each pixel by its distance from
+          a focus plane that racks back and forth, turning the lamps into bokeh
+          discs.
+        </p>
+      </li>
     </ul>
     <footer>
       <a href="https://github.com/learosema/magic-pixels"

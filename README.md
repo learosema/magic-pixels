@@ -17,6 +17,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - built-in matrix uniforms (`modelMatrix`, `viewMatrix`, `projectionMatrix`, `modelViewMatrix`, `normalMatrix`) set by the renderer
 - lights as scene graph nodes (`AmbientLight`, `DirectionalLight`, `PointLight`), passed to shaders as built-in uniforms in view space
 - a physically based material (`createPbrMaterial`): the glTF metallic-roughness model with base colour, metallic-roughness, normal, occlusion and emissive maps, alpha modes and an unlit variant
+- render targets (`RenderTarget`, `renderer.render(scene, camera, target)`) with a colour texture and a depth renderbuffer or texture, optionally floating point, plus fullscreen post-processing passes with a tone-mapping material (`createToneMapMaterial`)
 - a glTF 2.0 loader (`loadGltf`, `parseGltf`) for `.gltf` and `.glb` files: nodes, meshes, PBR materials, textures, cameras, `KHR_lights_punctual` lights, and quantized, meshopt- and Draco-compressed meshes (static models; animations and skinning are not supported yet)
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
@@ -348,6 +349,41 @@ texture.needsUpdate = true;
 const fromBytes = await Texture.fromBlob(blob);
 ```
 
+### Render targets and post-processing
+
+A `RenderTarget` is a texture the renderer can draw into. Its `colorAttachment` is a normal `Texture`,
+so a material can sample what was rendered. `float: true` gives a floating point target that can hold
+values above 1 (it needs the `EXT_color_buffer_float` extension; the renderer throws if the browser
+does not have it), `depth` is `'renderbuffer'` (the default), `'texture'` or `'none'`. Change `width`
+and `height` to resize it.
+
+A fullscreen pass is a mesh that covers the screen, drawn with a material that reads the target. The
+tone-mapping material converts linear HDR to sRGB, so the scene is drawn without the sRGB conversion:
+
+```js
+const target = new RenderTarget(canvas.width, canvas.height, { float: true });
+const material = createPbrMaterial({ linearOutput: true }); // linear colour, no sRGB conversion
+// ...
+
+const pass = new Scene();
+pass.add(
+  createFullscreenMesh(
+    createToneMapMaterial({
+      map: target.colorAttachment,
+      exposure: 1, // a uniform, can change every frame
+      toneMapping: ToneMapping.ACES, // or REINHARD, NONE
+    })
+  )
+);
+
+renderer.render(scene, camera, target); // into the target
+renderer.render(pass, camera); // to the canvas; any camera works
+```
+
+`createFullscreenMaterial(fragmentShader, uniforms)` builds the material for your own passes; the
+fragment shader reads `in vec2 vUv` (0 to 1 across the screen). A `Texture` also has `width` and
+`height`, and `Texture.empty(width, height)` makes one without pixels.
+
 ### Updating geometry
 
 Write into an attribute's `data` and flag it; the renderer re-uploads it with `bufferSubData`
@@ -392,6 +428,7 @@ Rendering an object again after disposing it recreates its resources.
 renderer.dispose(geometry); // buffers and VAO of one geometry
 renderer.dispose(material); // the program of one material
 renderer.dispose(texture); // one texture
+renderer.dispose(target); // framebuffer, renderbuffer and textures of one render target
 renderer.dispose(); // everything; loses the context
 ```
 

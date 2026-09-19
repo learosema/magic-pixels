@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Depth texture &mdash; magic-pixels example</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      #canvas {
+        touch-action: none;
+        cursor: ew-resize;
+      }
+      /* the depth half is white: keep the text readable on it */
+      .overlay > div,
+      .overlay > a {
+        background: rgba(17, 19, 24, 0.78);
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+      }
+      .controls {
+        pointer-events: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+      }
+      .controls select {
+        font: inherit;
+        padding: 0.25rem 0.5rem;
+        background: #1c1f28;
+        color: inherit;
+        border: 1px solid #2a2d38;
+        border-radius: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div class="overlay">
+      <div>
+        <h1>Depth texture</h1>
+        <p>
+          The scene is drawn into a <code>RenderTarget</code> with
+          <code>depth: 'texture'</code>. Besides the colour, the GPU's depth
+          buffer is now a texture a shader can read. A second pass shows both,
+          colour on the left of the split and depth on the right; move the
+          pointer to move the split. The depth buffer does not store distance in
+          a straight line, so <em>raw depth</em> looks almost white everywhere;
+          <em>linearized</em> undoes the perspective projection. The white
+          background is the far plane.
+        </p>
+        <div class="controls">
+          <label>
+            Depth shown as
+            <select id="mode">
+              <option value="linear">linearized distance</option>
+              <option value="raw">raw depth buffer</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <a href="../">&larr; all examples</a>
+    </div>
+    <script type="module" src="./script.js"></script>
+  </body>
+</html>

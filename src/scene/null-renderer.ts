@@ -8,6 +8,7 @@ import { prepareScene } from './renderer';
 import type { Renderer } from './renderer';
 import type { Scene } from './scene';
 import type { Texture } from './texture';
+import type { RenderTarget } from './render-target';
 
 /** What a `NullRenderer` records per `render` call */
 export type NullFrame = {
@@ -19,6 +20,8 @@ export type NullFrame = {
   transparent: Mesh[];
   /** visible lights, in scene-tree order */
   lights: Light[];
+  /** the target rendered into, if any */
+  target?: RenderTarget;
 };
 
 /**
@@ -45,9 +48,9 @@ export class NullRenderer implements Renderer {
     return this.frames[this.frames.length - 1];
   }
 
-  render(scene: Scene, camera: Camera): void {
+  render(scene: Scene, camera: Camera, target?: RenderTarget): void {
     const { meshes, transparent, lights } = prepareScene(scene, camera);
-    this.frames.push({ scene, camera, meshes, transparent, lights });
+    this.frames.push({ scene, camera, meshes, transparent, lights, target });
   }
 
   setSize(width: number, height: number): void {

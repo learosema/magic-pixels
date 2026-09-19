@@ -18,6 +18,8 @@ type Counts = {
   buffers: number;
   vertexArrays: number;
   textures: number;
+  framebuffers: number;
+  renderbuffers: number;
 };
 
 export type FakeState = {
@@ -27,6 +29,8 @@ export type FakeState = {
   lost: boolean;
   /** all recorded calls of a method */
   callsTo(name: string): GLCall[];
+  /** make `getExtension` return null for these extensions */
+  removeExtensions(...names: string[]): void;
   /** attribute location bound for a program by name (-1 if unbound) */
   attribLocation(program: WebGLProgram, name: string): number;
 };
@@ -66,6 +70,16 @@ const GLSL_TYPES: Record<string, number> = {
 };
 
 const CONSTANTS = {
+  FRAMEBUFFER: 0x8d40,
+  RENDERBUFFER: 0x8d41,
+  COLOR_ATTACHMENT0: 0x8ce0,
+  DEPTH_ATTACHMENT: 0x8d00,
+  FRAMEBUFFER_COMPLETE: 0x8cd5,
+  DEPTH_COMPONENT: 0x1902,
+  DEPTH_COMPONENT24: 0x81a6,
+  RGBA8: 0x8058,
+  RGBA16F: 0x881a,
+  HALF_FLOAT: 0x140b,
   DEPTH_BUFFER_BIT: 0x0100,
   COLOR_BUFFER_BIT: 0x4000,
   POINTS: 0,
@@ -168,6 +182,8 @@ class FakeContext {
     buffers: 0,
     vertexArrays: 0,
     textures: 0,
+    framebuffers: 0,
+    renderbuffers: 0,
   };
   deleted: Counts = {
     programs: 0,
@@ -175,6 +191,8 @@ class FakeContext {
     buffers: 0,
     vertexArrays: 0,
     textures: 0,
+    framebuffers: 0,
+    renderbuffers: 0,
   };
   lost = false;
   drawingBufferWidth = 0;
@@ -182,8 +200,23 @@ class FakeContext {
 
   private nextId = 1;
 
+  extensions: Record<string, unknown> = {
+    WEBGL_lose_context: {
+      loseContext: () => {
+        this.lost = true;
+      },
+    },
+    EXT_color_buffer_float: {},
+  };
+
   constructor() {
     Object.assign(this, CONSTANTS);
+  }
+
+  removeExtensions(...extensionNames: string[]): void {
+    for (const extName of extensionNames) {
+      delete this.extensions[extName];
+    }
   }
 
   callsTo(name: string): GLCall[] {
@@ -348,6 +381,34 @@ class FakeContext {
     this.deleted.textures++;
   }
 
+  createFramebuffer(): WebGLFramebuffer {
+    this.record('createFramebuffer', []);
+    this.created.framebuffers++;
+    return { id: this.nextId++ } as unknown as WebGLFramebuffer;
+  }
+
+  deleteFramebuffer(framebuffer: WebGLFramebuffer): void {
+    this.record('deleteFramebuffer', [framebuffer]);
+    this.deleted.framebuffers++;
+  }
+
+  createRenderbuffer(): WebGLRenderbuffer {
+    this.record('createRenderbuffer', []);
+    this.created.renderbuffers++;
+    return { id: this.nextId++ } as unknown as WebGLRenderbuffer;
+  }
+
+  deleteRenderbuffer(renderbuffer: WebGLRenderbuffer): void {
+    this.record('deleteRenderbuffer', [renderbuffer]);
+    this.deleted.renderbuffers++;
+  }
+
+  // --- framebuffer
+
+  checkFramebufferStatus(): number {
+    return CONSTANTS.FRAMEBUFFER_COMPLETE;
+  }
+
   // --- queries
 
   getParameter(pname: number): number {
@@ -358,14 +419,7 @@ class FakeContext {
   }
 
   getExtension(name: string): unknown {
-    if (name === 'WEBGL_lose_context') {
-      return {
-        loseContext: () => {
-          this.lost = true;
-        },
-      };
-    }
-    return null;
+    return this.extensions[name] ?? null;
   }
 }
 

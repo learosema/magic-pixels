@@ -53,6 +53,7 @@ one draw call.
 - [Materials and uniforms](./materials.md),
 - [Textures](./textures.md)
 - [The renderer](./renderer.md)
+- [Rendering to textures](../rendering/index.md)
 
 ## The one design rule
 
