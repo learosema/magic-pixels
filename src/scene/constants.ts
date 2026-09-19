@@ -40,6 +40,19 @@ export function usesMipmaps(filter: Filter): boolean {
   return filter.includes('mipmap');
 }
 
+/**
+ * What kind of depth buffer a render target gets, if any. `'renderbuffer'`
+ * is cheap and write-only; `'texture'` can be sampled afterwards (e.g.
+ * shadow maps); `'none'` skips depth testing entirely.
+ */
+export const DepthAttachment = {
+  NONE: 'none',
+  RENDERBUFFER: 'renderbuffer',
+  TEXTURE: 'texture',
+} as const;
+export type DepthAttachment =
+  (typeof DepthAttachment)[keyof typeof DepthAttachment];
+
 export const ColorSpace = {
   LINEAR: 'linear',
   SRGB: 'srgb',
