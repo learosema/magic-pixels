@@ -1,6 +1,7 @@
 import {
   AlphaMode,
   ColorSpace,
+  DepthAttachment,
   DrawMode,
   Filter,
   Side,
@@ -9,6 +10,8 @@ import {
 } from './constants';
 import { Texture } from './texture';
 import type { TextureData, TextureOptions } from './texture';
+import { RenderTarget } from './render-target';
+import type { RenderTargetOptions } from './render-target';
 import { Object3D } from './object3d';
 import { Scene } from './scene';
 import { Camera, PerspectiveCamera, OrthographicCamera } from './camera';
@@ -38,6 +41,7 @@ import type { NullFrame } from './null-renderer';
 export type {
   TextureData,
   TextureOptions,
+  RenderTargetOptions,
   Material,
   PbrMap,
   PbrMaterialOptions,
@@ -51,6 +55,7 @@ export type {
 
 export {
   Texture,
+  RenderTarget,
   Object3D,
   Scene,
   Camera,
@@ -69,6 +74,7 @@ export {
   Wrapping,
   DrawMode,
   ColorSpace,
+  DepthAttachment,
   Side,
   AlphaMode,
   usesMipmaps,

@@ -30,6 +30,7 @@ import {
 } from './utils';
 import {
   Texture,
+  RenderTarget,
   Object3D,
   Scene,
   Camera,
@@ -48,6 +49,7 @@ import {
   Wrapping,
   DrawMode,
   ColorSpace,
+  DepthAttachment,
   Side,
   AlphaMode,
   createBasicMaterial,
@@ -62,6 +64,7 @@ import type {
   NullFrame,
   TextureData,
   TextureOptions,
+  RenderTargetOptions,
   Material,
   PbrMap,
   PbrMaterialOptions,
@@ -118,6 +121,7 @@ export type {
   Uniforms,
   TextureData,
   TextureOptions,
+  RenderTargetOptions,
   Material,
   PbrMap,
   PbrMaterialOptions,
@@ -171,6 +175,7 @@ export {
 };
 export {
   Texture,
+  RenderTarget,
   Object3D,
   Scene,
   Camera,
@@ -190,6 +195,7 @@ export {
   Wrapping,
   DrawMode,
   ColorSpace,
+  DepthAttachment,
   Side,
   AlphaMode,
   createDefaultMaterial,
