@@ -49,6 +49,7 @@
     "esbuild": "^0.28.2",
     "esbuild-plugin-glsl": "^1.4.2",
     "eslint": "^10.10.0",
+    "globals": "^17.12.0",
     "prettier": "^3.9.6",
     "publint": "^0.3.24",
     "typedoc": "^0.28.20",
