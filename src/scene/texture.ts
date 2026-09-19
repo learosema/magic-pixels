@@ -62,6 +62,26 @@ export class Texture {
     }
   }
 
+  get width(): number {
+    if ('naturalWidth' in this.image) {
+      return this.image.naturalWidth;
+    }
+    if ('videoWidth' in this.image) {
+      return this.image.videoWidth;
+    }
+    return this.image.width;
+  }
+
+  get height(): number {
+    if ('naturalHeight' in this.image) {
+      return this.image.naturalHeight;
+    }
+    if ('videoHeight' in this.image) {
+      return this.image.videoHeight;
+    }
+    return this.image.height;
+  }
+
   static async fromImageUrl(
     url: string,
     options?: TextureOptions
@@ -88,6 +108,26 @@ export class Texture {
     options?: TextureOptions
   ): Promise<Texture> {
     const image = await createImageBitmap(blob);
+    return new Texture(image, options);
+  }
+
+  /**
+   * A texture with no image data yet, sized `width` x `height`. Used for
+   * render target attachments: nothing ever samples this placeholder's
+   * pixels, so its `data` is empty and only `width`/`height` are real -
+   * the renderer allocates GPU storage at that size instead of uploading
+   * pixels.
+   */
+  static empty(
+    width: number,
+    height: number,
+    options?: TextureOptions
+  ): Texture {
+    const image = {
+      width,
+      height,
+      data: new Uint8ClampedArray(0),
+    } as ImageData;
     return new Texture(image, options);
   }
 }
