@@ -2,7 +2,7 @@ import { defineConfig } from 'eslint/config';
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
-import { browser } from 'globals';
+import globals from 'globals';
 
 export default defineConfig(
   { ignores: ['dist', 'site', 'coverage'] },
@@ -11,7 +11,7 @@ export default defineConfig(
   {
     languageOptions: {
 			globals: {
-				...browser,
+				...globals.browser,
 			},
 		},
     rules: {
