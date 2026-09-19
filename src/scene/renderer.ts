@@ -5,6 +5,7 @@ import { Light } from './light';
 import type { Material } from './material';
 import { Mesh } from './mesh';
 import type { Object3D } from './object3d';
+import type { RenderTarget } from './render-target';
 import type { Scene } from './scene';
 import type { Texture } from './texture';
 
@@ -21,7 +22,7 @@ import type { Texture } from './texture';
  */
 export interface Renderer {
   /** Update the world matrices and draw the visible meshes of the scene */
-  render(scene: Scene, camera: Camera): void;
+  render(scene: Scene, camera: Camera, target?: RenderTarget): void;
   /** Resize the drawing surface in CSS pixels; `pixelRatio` is applied */
   setSize(width: number, height: number): void;
   /** Device pixel ratio applied by `setSize` (default 1) */

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback visualizer &mdash; magic-pixels example</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      #canvas {
+        cursor: pointer;
+      }
+      #status {
+        font-size: 0.85rem;
+        opacity: 0.8;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div class="overlay">
+      <div>
+        <h1>Feedback visualizer</h1>
+        <p>
+          A Winamp-style trail effect from two <code>RenderTarget</code>s that
+          take turns (ping-pong). Every frame, a fullscreen pass reads the last
+          frame, zooms and twists it a little, blurs it and fades it into the
+          other target; then a fresh noise curve is drawn on top, and the result
+          is tone mapped to the canvas. The curve is brighter than 1, so the
+          float target keeps its glow. Click to reseed the noise.
+        </p>
+        <div id="status"></div>
+      </div>
+      <a href="../">&larr; all examples</a>
+    </div>
+    <script type="module" src="./script.js"></script>
+  </body>
+</html>

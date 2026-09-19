@@ -9,7 +9,7 @@ title: The renderer
 {@link Renderer} is small and deliberately sits _above_ the GPU API:
 
 ```ts
-render(scene, camera)
+render(scene, camera, target?)
 setSize(width, height)
 setPixelRatio(ratio)
 setClearColor(color, alpha?)
@@ -44,6 +44,7 @@ farthest first, in the order that composites correctly.
 ```
 frame = prepareScene(scene, camera)
 convert frame.lights into view-space uniform arrays, once per frame
+bind the target's framebuffer and viewport, or the canvas's        (cached)
 if autoClear: clear colour and depth
 for each mesh in frame.meshes, then frame.transparent:
   program + uniform table for mesh.material's shader sources       (cached)
@@ -55,9 +56,10 @@ for each mesh in frame.meshes, then frame.transparent:
   bindVertexArray
   drawElements or drawArrays with the material's draw mode
 bindVertexArray(null)
+bind the canvas's framebuffer and viewport again, if there was a target
 ```
 
-The two `(cached)` lines are where all the GL setup lives. Each is a
+The `(cached)` lines are where all the GL setup lives. Each is a
 "get or create": look the scene object up in a map, validate the cached
 resources (material: same shader sources; geometry: same `version`), and
 rebuild on mismatch. Geometries are keyed by object identity; programs are
@@ -102,6 +104,18 @@ frame.
 `setClearColor()` sets the background; `autoClear = false` keeps the
 previous frame, for feedback effects.
 
+## Render targets
+
+`render(scene, camera, target)` draws into a {@link RenderTarget}'s
+framebuffer instead of the canvas. The framebuffer, its depth renderbuffer
+and the GPU textures of its attachments are built the first time a target is
+rendered to and kept in a map keyed by the target; if `target.width` or
+`height` no longer match what was built, they are rebuilt at the new size.
+Every `render()` call starts by binding the framebuffer and viewport it needs,
+the target's or the canvas's, so a frame never depends on the last one.
+[Render targets](../rendering/render-targets.md) explains framebuffers and
+attachments.
+
 ## Size and pixel ratio
 
 `setSize(width, height)` sets the canvas's backing store to `width ×
@@ -112,8 +126,8 @@ cost.
 
 ## dispose
 
-`dispose(object)` frees the GL resources of one geometry, material or
-texture; the next draw re-creates them if the object is still in use, so it
+`dispose(object)` frees the GL resources of one geometry, material,
+texture or render target; the next draw re-creates them if the object is still in use, so it
 is safe to call on anything. `dispose()` with no argument frees everything
 and loses the context; the renderer is finished afterwards.
 

@@ -19,7 +19,10 @@ const material = {
 `createDefaultMaterial()`, `createBasicMaterial(color)` and
 `createNormalMaterial()` are ready-made unlit ones, and
 `createPbrMaterial(options)` is the lit one: the glTF metallic-roughness
-model, described in [PBR material](../gltf/pbr-material.md). There is no
+model, described in [PBR material](../gltf/pbr-material.md).
+`createFullscreenMaterial(fragmentShader, uniforms)` and
+`createToneMapMaterial({ map, exposure, toneMapping })` are the materials of
+[fullscreen passes](../rendering/tone-mapping.md). There is no
 material class: a material _is_ its shader plus its uniforms, and the PBR
 material is built the same way as any other. In three.js terms everything
 is a `RawShaderMaterial`.

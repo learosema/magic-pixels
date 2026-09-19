@@ -185,6 +185,10 @@ the cutoff and writes 1, `BLEND` writes the base colour's alpha and lets
 the render state from the [material render state](./material-render-state.md)
 step composite it.
 
+The conversion is the one thing a scene drawn into a render target must not
+do: a later pass converts once, after tone mapping. The `linearOutput` option
+skips it; see [Tone mapping](../rendering/tone-mapping.md).
+
 ## In magic-pixels
 
 `createPbrMaterial(options)` returns an ordinary {@link Material} whose
@@ -196,7 +200,9 @@ at any time; the maps (`baseColorMap`, `metallicRoughnessMap`,
 `normalMap`, `occlusionMap`, `emissiveMap`) are {@link Texture} uniforms,
 each optionally with the texture coordinate set to sample (`uv` or `uv1`,
 see {@link PbrMap}). `alphaMode` and `doubleSided` set `transparent` and
-`side`; `unlit` gives the `KHR_materials_unlit` variant, base colour only.
+`side`; `unlit` gives the `KHR_materials_unlit` variant, base colour only;
+`linearOutput` writes the linear colour without the sRGB conversion, for
+rendering into a float render target.
 The material reads the lights through the built-in light uniforms of the
 previous step. See {@link PbrMaterialOptions} for the whole list.
 

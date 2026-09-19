@@ -6,7 +6,7 @@ import type { Mesh } from '../scene/mesh';
 import type { Scene } from '../scene/scene';
 import { prepareScene, type Renderer } from '../scene/renderer';
 import { Texture } from '../scene/texture';
-import { usesMipmaps } from '../scene/constants';
+import { DepthAttachment, usesMipmaps } from '../scene/constants';
 import { ERRORS } from './webgl-errors';
 import {
   GL_CULL_FACE,
@@ -28,6 +28,7 @@ import {
   createLightUniforms,
   type LightUniforms,
 } from './light-uniforms';
+import type { RenderTarget } from '../scene/render-target';
 
 type GeometryResources = {
   vao: WebGLVertexArrayObject;
@@ -63,6 +64,13 @@ type MaterialResources = {
 
 type TextureResources = {
   texture: WebGLTexture;
+};
+
+type RenderTargetResources = {
+  framebuffer: WebGLFramebuffer;
+  depthRenderbuffer: WebGLRenderbuffer | null;
+  width: number;
+  height: number;
 };
 
 /**
@@ -154,6 +162,7 @@ export class WebGL2Renderer implements Renderer {
   /** clear color and depth at the start of every `render` (default true) */
   autoClear = true;
 
+  private renderTargets = new Map<RenderTarget, RenderTargetResources>();
   private geometries = new Map<BufferGeometry, GeometryResources>();
   private materials = new Map<Material, MaterialResources>();
   /** programs by shader source, shared between materials */
@@ -189,12 +198,14 @@ export class WebGL2Renderer implements Renderer {
    * are created on first use and reused afterwards.
    * @param scene the scene graph
    * @param camera the camera providing view and projection matrices
+   * @param target draw into this render target instead of the canvas
    * @returns this instance
    */
-  render(scene: Scene, camera: Camera): WebGL2Renderer {
+  render(scene: Scene, camera: Camera, target?: RenderTarget): WebGL2Renderer {
     const { gl } = this;
     const frame = prepareScene(scene, camera);
     collectLightUniforms(frame.lights, camera, this.lightUniforms);
+    this.bindDrawTarget(target);
     if (this.autoClear) {
       // clear honours the depth mask, which a transparent material drawn
       // last in the previous frame leaves switched off
@@ -211,7 +222,27 @@ export class WebGL2Renderer implements Renderer {
       this.drawMesh(mesh, camera);
     }
     gl.bindVertexArray(null);
+    if (target) {
+      this.bindDrawTarget();
+    }
     return this;
+  }
+
+  /**
+   * Make the framebuffer and viewport of `target` current, or those of the
+   * canvas when there is none. Called at the start of every render so a
+   * frame never depends on what the previous one left bound.
+   */
+  private bindDrawTarget(target?: RenderTarget): void {
+    const { gl } = this;
+    if (target) {
+      const { framebuffer } = this.getRenderTargetResources(target);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.viewport(0, 0, target.width, target.height);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    }
   }
 
   private drawMesh(mesh: Mesh, camera: Camera): void {
@@ -315,16 +346,18 @@ export class WebGL2Renderer implements Renderer {
   /**
    * Free GPU resources. Without an argument, everything the renderer created
    * is deleted and the context is lost; the renderer is unusable afterwards.
-   * With a geometry, material or texture, only that object's resources are
-   * freed. It is recreated on the next render if still in use.
+   * With a geometry, material, texture or render target, only that object's
+   * resources are freed. It is recreated on the next render if still in use.
    */
-  dispose(object?: BufferGeometry | Material | Texture): void {
+  dispose(object?: BufferGeometry | Material | Texture | RenderTarget): void {
     if (object === undefined) {
       this.disposeAll();
       return;
     }
     if (this.geometries.has(object as BufferGeometry)) {
       this.disposeGeometry(object as BufferGeometry);
+    } else if (this.renderTargets.has(object as RenderTarget)) {
+      this.disposeRenderTarget(object as RenderTarget);
     } else if (this.textures.has(object as Texture)) {
       this.disposeTexture(object as Texture);
     } else if (this.materials.has(object as Material)) {
@@ -339,6 +372,9 @@ export class WebGL2Renderer implements Renderer {
     }
     for (const material of [...this.materials.keys()]) {
       this.disposeMaterial(material);
+    }
+    for (const target of [...this.renderTargets.keys()]) {
+      this.disposeRenderTarget(target);
     }
     for (const texture of [...this.textures.keys()]) {
       this.disposeTexture(texture);
@@ -646,15 +682,30 @@ export class WebGL2Renderer implements Renderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, texture.flipY);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        GL_INTERNAL_FORMAT[texture.colorSpace],
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        texture.image
-      );
+      if (texture.isEmpty) {
+        // sampled before anything rendered into it: zeros of the right size
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA8,
+          texture.width,
+          texture.height,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          null
+        );
+      } else {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, texture.flipY);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          GL_INTERNAL_FORMAT[texture.colorSpace],
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          texture.image
+        );
+      }
       if (usesMipmaps(texture.minFilter)) {
         gl.generateMipmap(gl.TEXTURE_2D);
       }
@@ -669,6 +720,175 @@ export class WebGL2Renderer implements Renderer {
     }
     this.gl.deleteTexture(resources.texture);
     this.textures.delete(texture);
+  }
+
+  // ------------------------------------------------------------ render targets
+
+  private getRenderTargetResources(
+    target: RenderTarget
+  ): RenderTargetResources {
+    let resources = this.renderTargets.get(target);
+    if (
+      resources &&
+      (resources.width !== target.width || resources.height !== target.height)
+    ) {
+      // resized: texture and renderbuffer storage is fixed at allocation, so
+      // rebuild the framebuffer at the new size
+      this.disposeRenderTarget(target);
+      resources = undefined;
+    }
+    if (!resources) {
+      resources = this.createRenderTargetResources(target);
+      this.renderTargets.set(target, resources);
+    }
+    return resources;
+  }
+
+  private disposeRenderTarget(target: RenderTarget): void {
+    const resources = this.renderTargets.get(target);
+    if (!resources) {
+      return;
+    }
+    const { gl } = this;
+    gl.deleteFramebuffer(resources.framebuffer);
+    if (resources.depthRenderbuffer) {
+      gl.deleteRenderbuffer(resources.depthRenderbuffer);
+    }
+    this.disposeTexture(target.colorAttachment);
+    if (target.depthAttachment) {
+      this.disposeTexture(target.depthAttachment);
+    }
+    this.renderTargets.delete(target);
+  }
+
+  /**
+   * Build the framebuffer of a render target: a colour texture, and a depth
+   * renderbuffer or depth texture if the target asks for one. Leaves the new
+   * framebuffer bound.
+   */
+  private createRenderTargetResources(
+    target: RenderTarget
+  ): RenderTargetResources {
+    const { gl } = this;
+    const { width, height } = target;
+    if (target.float && !gl.getExtension('EXT_color_buffer_float')) {
+      throw Error(ERRORS.FLOAT_TARGET_UNSUPPORTED);
+    }
+
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    const color = this.createTargetTexture(
+      target.colorAttachment,
+      width,
+      height,
+      target.float ? gl.RGBA16F : gl.RGBA8,
+      gl.RGBA,
+      target.float ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE
+    );
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      color,
+      0
+    );
+
+    let depthRenderbuffer: WebGLRenderbuffer | null = null;
+    if (target.depth === DepthAttachment.RENDERBUFFER) {
+      depthRenderbuffer = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderbuffer);
+      gl.renderbufferStorage(
+        gl.RENDERBUFFER,
+        gl.DEPTH_COMPONENT24,
+        width,
+        height
+      );
+      gl.framebufferRenderbuffer(
+        gl.FRAMEBUFFER,
+        gl.DEPTH_ATTACHMENT,
+        gl.RENDERBUFFER,
+        depthRenderbuffer
+      );
+    } else if (target.depthAttachment) {
+      const depth = this.createTargetTexture(
+        target.depthAttachment,
+        width,
+        height,
+        gl.DEPTH_COMPONENT24,
+        gl.DEPTH_COMPONENT,
+        gl.UNSIGNED_INT
+      );
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.DEPTH_ATTACHMENT,
+        gl.TEXTURE_2D,
+        depth,
+        0
+      );
+    }
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw Error(ERRORS.FRAMEBUFFER_INCOMPLETE);
+    }
+    return { framebuffer, depthRenderbuffer, width, height };
+  }
+
+  /**
+   * Allocate GPU storage for a render target attachment and register it in
+   * `this.textures`, so a material using the `Texture` as a uniform binds the
+   * same GPU texture the framebuffer draws into. `needsUpdate` is switched off
+   * so `bindTexture` never uploads the placeholder image over the render.
+   */
+  private createTargetTexture(
+    texture: Texture,
+    width: number,
+    height: number,
+    internalFormat: number,
+    format: number,
+    type: number
+  ): WebGLTexture {
+    const { gl } = this;
+    // a material may have sampled the texture before the target was first
+    // rendered to; that placeholder storage is replaced
+    this.disposeTexture(texture);
+    const glTexture = gl.createTexture();
+    this.textures.set(texture, { texture: glTexture });
+    texture.needsUpdate = false;
+
+    gl.bindTexture(gl.TEXTURE_2D, glTexture);
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      GL_FILTER[texture.minFilter]
+    );
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      GL_FILTER[texture.magFilter]
+    );
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      GL_WRAPPING[texture.wrapS]
+    );
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_T,
+      GL_WRAPPING[texture.wrapT]
+    );
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      internalFormat,
+      width,
+      height,
+      0,
+      format,
+      type,
+      null
+    );
+    return glTexture;
   }
 
   // -------------------------------------------------------------- geometries

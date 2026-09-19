@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="230" viewBox="0 0 720 230" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="719" height="229" rx="8" fill="#ffffff" stroke="#cccccc"/>
+
+  <text x="24" y="30" font-weight="600" fill="#222">Two passes</text>
+
+  <!-- 1: scene -->
+  <rect x="24" y="60" width="140" height="84" rx="6" fill="#f4f4f4" stroke="#333"/>
+  <text x="94" y="86" text-anchor="middle" font-weight="600" fill="#222">Pass 1: scene</text>
+  <text x="94" y="106" text-anchor="middle" fill="#555">PBR materials with</text>
+  <text x="94" y="124" text-anchor="middle" fill="#555" font-family="monospace" font-size="12">linearOutput: true</text>
+
+  <line x1="164" y1="102" x2="208" y2="102" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 2: target -->
+  <rect x="210" y="60" width="150" height="84" rx="6" fill="#fdf1e3" stroke="#d9822b" stroke-width="1.5"/>
+  <text x="285" y="86" text-anchor="middle" font-weight="600" fill="#222">RenderTarget</text>
+  <text x="285" y="106" text-anchor="middle" fill="#555" font-family="monospace">float: true</text>
+  <text x="285" y="124" text-anchor="middle" fill="#555" font-size="12">linear HDR, may exceed 1</text>
+
+  <line x1="360" y1="102" x2="404" y2="102" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="382" y="92" text-anchor="middle" fill="#777" font-size="11">samples</text>
+
+  <!-- 3: pass -->
+  <rect x="406" y="60" width="160" height="84" rx="6" fill="#f4f4f4" stroke="#333"/>
+  <text x="486" y="86" text-anchor="middle" font-weight="600" fill="#222">Pass 2: fullscreen</text>
+  <text x="486" y="106" text-anchor="middle" fill="#555">exposure &#183; tone curve</text>
+  <text x="486" y="124" text-anchor="middle" fill="#555">linear &#8594; sRGB</text>
+
+  <line x1="566" y1="102" x2="610" y2="102" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 4: canvas -->
+  <rect x="612" y="60" width="84" height="84" rx="6" fill="#e9f1fb" stroke="#2b6fd9" stroke-width="1.5"/>
+  <text x="654" y="94" text-anchor="middle" font-weight="600" fill="#222">Canvas</text>
+  <text x="654" y="114" text-anchor="middle" fill="#555">sRGB, 0..1</text>
+
+  <!-- value ranges -->
+  <text x="285" y="172" text-anchor="middle" fill="#555" font-size="12">0 ... 50 and more</text>
+  <text x="654" y="172" text-anchor="middle" fill="#555" font-size="12">0 ... 1</text>
+  <text x="24" y="206" fill="#777" font-size="12">renderer.render(scene, camera, target)</text>
+  <text x="406" y="206" fill="#777" font-size="12">renderer.render(pass, camera)</text>
+</svg>

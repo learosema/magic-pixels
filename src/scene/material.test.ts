@@ -7,9 +7,14 @@ import {
 } from '../test-utils/fake-webgl2';
 import { WebGL2Renderer } from '../webgl/webgl2-renderer';
 import { PerspectiveCamera } from './camera';
-import { AlphaMode, Side } from './constants';
+import { AlphaMode, Side, ToneMapping } from './constants';
 import { AmbientLight } from './light';
-import { createPbrMaterial, type PbrMaterialOptions } from './material';
+import {
+  createFullscreenMaterial,
+  createPbrMaterial,
+  createToneMapMaterial,
+  type PbrMaterialOptions,
+} from './material';
 import { Mesh } from './mesh';
 import { Scene } from './scene';
 import { Texture } from './texture';
@@ -73,6 +78,7 @@ const VARIANTS: Record<string, PbrMaterialOptions> = {
   mask: { alphaMode: AlphaMode.MASK, baseColorMap: new Texture(createImage()) },
   blend: { alphaMode: AlphaMode.BLEND, doubleSided: true },
   unlit: { unlit: true, vertexColors: true },
+  linear: { linearOutput: true },
   lights: { maxDirectionalLights: 1, maxPointLights: 8 },
 };
 
@@ -172,6 +178,14 @@ describe('createPbrMaterial', () => {
     expect(defines.get('MAX_POINT_LIGHTS')).toBe('8');
   });
 
+  test('linearOutput is a define, off by default', () => {
+    expect(
+      definesOf(createPbrMaterial().glsl!.fragment).has('LINEAR_OUTPUT')
+    ).toBe(false);
+    const linear = createPbrMaterial({ linearOutput: true });
+    expect(definesOf(linear.glsl!.fragment).has('LINEAR_OUTPUT')).toBe(true);
+  });
+
   test('materials with the same options produce identical sources', () => {
     const map = new Texture(createImage());
     const a = createPbrMaterial({ baseColorMap: map, metallicFactor: 0 });
@@ -264,5 +278,46 @@ describe('createPbrMaterial', () => {
       renderer.render(scene, new PerspectiveCamera());
       expect(gl.created.programs).toBe(2);
     });
+  });
+});
+
+describe('createFullscreenMaterial', () => {
+  test('draws every pixel: no depth test, no depth writes', () => {
+    const map = new Texture(createImage());
+    const material = createFullscreenMaterial(
+      '#version 300 es\nvoid main() {}',
+      { map }
+    );
+    expect(material.depthTest).toBe(false);
+    expect(material.depthWrite).toBe(false);
+    expect(material.uniforms.map).toBe(map);
+    expect(material.glsl!.vertex).toContain('in vec2 position');
+    expect(material.glsl!.vertex).toContain('out vec2 vUv');
+  });
+});
+
+describe('createToneMapMaterial', () => {
+  const map = new Texture(createImage());
+
+  test('reads the map with an exposure of 1 and the ACES curve by default', () => {
+    const material = createToneMapMaterial({ map });
+    expect(material.uniforms).toEqual({ map, exposure: 1 });
+    const defines = definesOf(material.glsl!.fragment);
+    expect(defines.has('TONE_MAPPING_ACES')).toBe(true);
+    expect(defines.has('TONE_MAPPING_REINHARD')).toBe(false);
+  });
+
+  test('the curve is a define; none clamps', () => {
+    const reinhard = createToneMapMaterial({
+      map,
+      toneMapping: ToneMapping.REINHARD,
+      exposure: 2,
+    });
+    expect(reinhard.uniforms.exposure).toBe(2);
+    expect([...definesOf(reinhard.glsl!.fragment).keys()]).toEqual([
+      'TONE_MAPPING_REINHARD',
+    ]);
+    const none = createToneMapMaterial({ map, toneMapping: ToneMapping.NONE });
+    expect(definesOf(none.glsl!.fragment).size).toBe(0);
   });
 });

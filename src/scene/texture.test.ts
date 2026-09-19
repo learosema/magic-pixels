@@ -127,5 +127,7 @@ describe('Texture', () => {
     expect(texture.width).toBe(4);
     expect(texture.height).toBe(8);
     expect(texture.colorSpace).toBe(ColorSpace.SRGB);
+    expect(texture.isEmpty).toBe(true);
+    expect(new Texture(createImage()).isEmpty).toBe(false);
   });
 });

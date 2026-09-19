@@ -1,7 +1,9 @@
 #version 300 es
 // Fragment shader of the PBR material: the glTF metallic-roughness model
 // (Lambert diffuse + GGX/Smith/Schlick specular), lit by the light uniforms
-// the renderer injects, with the linear -> sRGB conversion at the end.
+// the renderer injects, with the linear -> sRGB conversion at the end
+// (unless LINEAR_OUTPUT: then the linear colour is written as it is, for a
+// render target that a tone-mapping pass reads).
 //
 // `createPbrMaterial()` inserts a block of #defines after the #version line.
 // Which maps exist has to be known when the shader is compiled (a sampler
@@ -17,6 +19,7 @@
 //   ALPHA_MASK, ALPHA_BLEND                 glTF alpha modes (neither: OPAQUE)
 //   DOUBLE_SIDED                            flip the normal on back faces
 //   UNLIT                                   base colour only, no lighting
+//   LINEAR_OUTPUT                           skip the linear -> sRGB conversion
 //   MAX_DIRECTIONAL_LIGHTS, MAX_POINT_LIGHTS  light array sizes
 precision highp float;
 
@@ -86,6 +89,16 @@ vec3 linearToSrgb(vec3 c) {
   vec3 lo = c * 12.92;
   vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
   return mix(lo, hi, step(vec3(0.0031308), c));
+}
+
+// The colour that leaves the shader: sRGB for the canvas, or as it is when
+// a later pass does the conversion.
+vec3 outputColor(vec3 c) {
+#ifdef LINEAR_OUTPUT
+  return c;
+#else
+  return linearToSrgb(c);
+#endif
 }
 
 // ---------------------------------------------------------- surface normal
@@ -209,7 +222,7 @@ void main() {
 #endif
 
 #ifdef UNLIT
-  fragColor = vec4(linearToSrgb(baseColor.rgb), baseColor.a);
+  fragColor = vec4(outputColor(baseColor.rgb), baseColor.a);
   return;
 #endif
 
@@ -283,5 +296,5 @@ void main() {
   color += emissiveFactor;
 #endif
 
-  fragColor = vec4(linearToSrgb(color), baseColor.a);
+  fragColor = vec4(outputColor(color), baseColor.a);
 }

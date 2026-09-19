@@ -83,6 +83,13 @@ mipmaps. The GL texture is cached in a map keyed by the {@link Texture}
 object; the same texture in ten materials is uploaded once.
 `renderer.dispose(texture)` frees it, and it is re-created if still used.
 
+A texture reports its `width` and `height` from whatever image it wraps (the
+natural size of an `<img>`, the video's frame size). `Texture.empty(width,
+height)` makes a texture with no pixels at all (`isEmpty` is `true`): it is what a
+{@link RenderTarget}'s attachments are, and the renderer allocates GPU
+storage for it instead of uploading an image, see
+[Render targets](../rendering/render-targets.md).
+
 Textures are bound to units per draw in the order they appear in the
 material's uniforms, starting from 0, so a shader with three samplers uses
 units 0 to 2. WebGL2 guarantees at least 16 units in the fragment shader.

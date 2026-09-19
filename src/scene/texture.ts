@@ -50,6 +50,13 @@ export class Texture {
   image: TextureData;
 
   /**
+   * True for a texture made with {@link Texture.empty}: it has a size but no
+   * pixels, so the renderer allocates GPU storage for it instead of
+   * uploading `image`.
+   */
+  isEmpty = false;
+
+  /**
    * Set to true after the image (or its contents, e.g. a video frame or a
    * canvas) changed so the renderer re-uploads it. The renderer resets it.
    */
@@ -128,6 +135,8 @@ export class Texture {
       height,
       data: new Uint8ClampedArray(0),
     } as ImageData;
-    return new Texture(image, options);
+    const texture = new Texture(image, options);
+    texture.isEmpty = true;
+    return texture;
   }
 }
