@@ -108,14 +108,6 @@ the colour. It also shows why depth values are not distances: switch between
 the raw depth buffer, which is almost white everywhere, and the linearized
 one. Change the `range` uniform to see closer or farther objects in detail.
 
-[Depth of field](https://learosema.github.io/magic-pixels/examples/14-depth-of-field/)
-puts the depth texture to work: a fullscreen pass turns each pixel's depth
-into a blur radius, growing with the distance from a focus plane, and gathers
-a disc of neighbours. The lamps are HDR (much brighter than 1), which is why
-they turn into bokeh discs; render the same scene into an 8-bit target and
-they shrink to dim spots. Drag the aperture to 0 and the whole picture is
-sharp.
-
 [Feedback visualizer](https://learosema.github.io/magic-pixels/examples/12-feedback-visualizer/)
 is the ping-pong pattern: two float targets take turns, a fullscreen pass
 blurs and fades the previous frame into the other one, and a noise curve is

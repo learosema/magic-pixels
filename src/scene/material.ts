@@ -80,6 +80,12 @@ export function createNormalMaterial(): Material {
   };
 }
 
+/**
+ * A flat colour: no lighting, no textures. For an unlit textured surface
+ * (baked lighting, stylised looks) use
+ * `createPbrMaterial({ unlit: true, baseColorMap })`.
+ * @param color CSS hex colour, `'#ff0000'` by default
+ */
 export function createBasicMaterial(color = '#ff0000'): Material {
   return {
     glsl: { vertex: defaultVertexShader, fragment: basicFragmentShader },
