@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Toy city &mdash; magic-pixels example</title>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <script type="importmap">
+      {
+        "imports": {
+          "magic-pixels": "../magic-pixels.js"
+        }
+      }
+    </script>
+    <canvas id="canvas"></canvas>
+    <div class="overlay">
+      <div>
+        <h1>Toy city</h1>
+        <p>
+          Drag to turn, right-drag or shift-drag to pan, wheel to zoom. Add
+          <code>?dof=0</code> to the address to switch the blur off.
+        </p>
+      </div>
+      <a href="../">&larr; all examples</a>
+    </div>
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
