@@ -149,6 +149,10 @@ a map means creating a new material. Set `vertexColors: true` to multiply in a `
 tangent is reconstructed from screen-space derivatives), and `unlit: true` for base colour only
 (`KHR_materials_unlit`). Materials with the same options share one program.
 
+`createBasicMaterial(color)` is a flat colour and takes no texture. For an unlit textured surface,
+for example one with baked-in lighting, use `createPbrMaterial({ unlit: true, baseColorMap })`: it
+skips lighting entirely and is cheap.
+
 ### Create a mesh and render
 
 ```js

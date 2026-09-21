@@ -27,6 +27,27 @@ material class: a material _is_ its shader plus its uniforms, and the PBR
 material is built the same way as any other. In three.js terms everything
 is a `RawShaderMaterial`.
 
+## Unlit and textured
+
+`createBasicMaterial(color)` is one flat colour: no lighting, and no texture
+input. A surface that should show a texture but ignore the lights, for
+example one with the lighting already painted into the image (baked
+lighting, lightmaps), or a stylised or toy-like look, is the PBR material
+with `unlit` set:
+
+```js
+const baked = await Texture.fromImageUrl('house.png', {
+  colorSpace: 'srgb',
+});
+const material = createPbrMaterial({ unlit: true, baseColorMap: baked });
+```
+
+The shader returns right after computing the base colour (factor times
+texture times vertex colour if `vertexColors` is on), so there is no light
+loop and no BRDF: a cheap fragment shader, and neither the lights nor a
+normal map have any effect. The base colour map should be created with
+`colorSpace: 'srgb'`, as for any colour image.
+
 ## Shader sources per language
 
 `glsl` is optional and keyed by language on purpose. A WebGL2 renderer reads
