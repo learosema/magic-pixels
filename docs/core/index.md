@@ -5,6 +5,7 @@ children:
   - ./scene-graph.md
   - ./cameras.md
   - ./geometry.md
+  - ./custom-geometry.md
   - ./materials.md
   - ./textures.md
   - ./renderer.md
@@ -50,6 +51,7 @@ one draw call.
 ## See also
 
 - [Geometry](./geometry.md),
+- [Building geometry by hand](./custom-geometry.md),
 - [Materials and uniforms](./materials.md),
 - [Textures](./textures.md)
 - [The renderer](./renderer.md)

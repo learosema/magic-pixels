@@ -200,7 +200,8 @@ at any time; the maps (`baseColorMap`, `metallicRoughnessMap`,
 `normalMap`, `occlusionMap`, `emissiveMap`) are {@link Texture} uniforms,
 each optionally with the texture coordinate set to sample (`uv` or `uv1`,
 see {@link PbrMap}). `alphaMode` and `doubleSided` set `transparent` and
-`side`; `unlit` gives the `KHR_materials_unlit` variant, base colour only;
+`side`; `unlit` gives the `KHR_materials_unlit` variant, base colour (factor, map and
+vertex colours) with no lighting, the way to show baked-in lighting;
 `linearOutput` writes the linear colour without the sRGB conversion, for
 rendering into a float render target.
 The material reads the lights through the built-in light uniforms of the

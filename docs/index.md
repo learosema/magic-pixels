@@ -17,6 +17,7 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [The Scene Graph](./core/scene-graph.md)
 - [The Cameras](./core/cameras.md)
 - [Geometries](./core/geometry.md)
+- [Building geometry by hand](./core/custom-geometry.md)
 - [Materials](./core/materials.md)
 - [Textures](./core/textures.md)
 - [Renderer](./core/renderer.md)
