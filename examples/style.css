@@ -31,20 +31,20 @@ canvas {
   gap: 1rem;
   padding: 1rem 1.25rem;
   pointer-events: none;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .overlay h1 {
   margin: 0 0 0.25rem;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.125rem;
+  font-family: Optima, Candara, 'Noto Sans', source-sans-pro, sans-serif;
+  font-weight: 900;
 }
 
 .overlay p {
   margin: 0;
   max-width: 32rem;
-  font-size: 0.85rem;
-  opacity: 0.8;
+  font-size: 1rem;
 }
 
 .overlay code {
