@@ -19,6 +19,7 @@ This is actually a project by [Lea](https://github.com/learosema), and she decid
 - a physically based material (`createPbrMaterial`): the glTF metallic-roughness model with base colour, metallic-roughness, normal, occlusion and emissive maps, alpha modes and an unlit variant
 - render targets (`RenderTarget`, `renderer.render(scene, camera, target)`) with a colour texture and a depth renderbuffer or texture, optionally floating point, plus fullscreen post-processing passes with a tone-mapping material (`createToneMapMaterial`)
 - a glTF 2.0 loader (`loadGltf`, `parseGltf`) for `.gltf` and `.glb` files: nodes, meshes, PBR materials, textures, cameras, `KHR_lights_punctual` lights, and quantized, meshopt- and Draco-compressed meshes (static models; animations and skinning are not supported yet)
+- orbit controls for mouse, touch and keyboard (`OrbitControls` from `magic-pixels/controls`): drag to turn, pan over a map, wheel or pinch to zoom, twist to turn, WASD to move, with easing
 - a `NullRenderer` that draws nothing, for testing scene code without a GPU
 - a `Mesh` contains a `BufferGeometry` and a `Material`,
 - a `Material` is what's a `RawShaderMaterial` in THREE, it has uniform variables, shader sources per language (`material.glsl`) and a `drawMode`
@@ -453,6 +454,71 @@ camera.updateProjectionMatrix();
 
 // parallel projection:
 const ortho = new OrthographicCamera(-2, 2, 1, -1, 0.1, 100);
+```
+
+### Orbit controls
+
+`OrbitControls` lets the user turn a `PerspectiveCamera` around a point with mouse or touch: drag
+(one finger) turns, right-drag, shift-drag or two fingers pan, the wheel or a pinch zooms, twisting
+two fingers turns. With `keyboard: true`, WASD or the arrow keys move over the ground and Q/E turn,
+which together with the default ground panning is enough to explore a map in a simple game. It lives
+on its own entry point, `magic-pixels/controls`, so the core stays free of DOM input code. The
+controls only set a goal; `update(dt)` eases the camera towards it each frame and points it at the
+target.
+
+```js
+import { OrbitControls } from 'magic-pixels/controls';
+
+camera.position.set(0, 2, 5); // where the orbit starts
+const controls = new OrbitControls(camera, canvas, {
+  target: new Vector(0, 0, 0), // the point to orbit, the origin by default
+  minDistance: 2,
+  maxDistance: 20,
+  screenSpacePanning: true, // pan in the screen plane; false pans over the ground
+});
+
+function frame(dt) {
+  controls.update(dt); // seconds since the last frame
+  renderer.render(scene, camera);
+}
+```
+
+`controls.goal` holds the `target`, `distance`, `yaw` and `pitch` the input aims for and
+`controls.current` where the camera is now; set a new goal and call `controls.snap()` to jump there
+without easing.
+
+The limits are options and properties alike, so they can change while the game runs; the goal is
+clamped to them on every `update()`:
+
+```js
+controls.minDistance = 5; // zoom range
+controls.maxDistance = 120;
+controls.minPitch = 0.1; // tilt range in radians: 0 is level, about 1.57 straight down
+controls.maxPitch = 1.4;
+// the box the target (the point looked at) stays in; null for no limit
+controls.targetBounds = new Box3(
+  new Vector(-50, 0, -50),
+  new Vector(50, 0, 50)
+);
+```
+
+`targetBounds` limits the target, not the camera: at the edge of the map the camera can still be up
+to `maxDistance` outside the box. The box is 3D, and with the default ground panning the target
+keeps its height, so give it a `min.y`/`max.y` around the ground.
+
+`autoRotate` turns it while nobody is touching, `enabled = false` ignores all input (while a menu
+is open, say), and `dispose()` removes the event listeners. In a
+page without a bundler, map both entry points in an import map:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "magic-pixels": "./magic-pixels.js",
+      "magic-pixels/controls": "./magic-pixels-controls.js"
+    }
+  }
+</script>
 ```
 
 The projection helpers `perspective`, `frustum` and `ortho` (returning a `Matrix`) and their

@@ -11,7 +11,8 @@ import {
   loadGltf,
   parseGltf,
   computeBoundingSphere,
-} from '../magic-pixels.js';
+} from 'magic-pixels';
+import { OrbitControls } from 'magic-pixels/controls';
 
 // ---------------------------------------------------------- models
 
@@ -190,13 +191,24 @@ renderer.setClearColor('#0b0d12');
 
 const scene = new Scene();
 
-// The loaded model hangs off a pivot that the mouse turns. A file's
-// own `Scene` is an `Object3D`, so it can be a child like anything else.
-const pivot = new Object3D();
-scene.add(pivot);
+// The loaded model hangs off a holder that stays in the scene while
+// models come and go. A file's own `Scene` is an `Object3D`, so it can
+// be a child like anything else.
+const holder = new Object3D();
+scene.add(holder);
 
 const camera = new PerspectiveCamera(40, 1, 0.1, 100);
 scene.add(camera);
+
+// The camera orbits the model; it spins slowly until the first touch.
+// Screen-space panning keeps the model under the pointer from any angle.
+const controls = new OrbitControls(camera, canvas, {
+  screenSpacePanning: true,
+  autoRotate: -0.3,
+});
+canvas.addEventListener('pointerdown', () => (controls.autoRotate = 0), {
+  once: true,
+});
 
 // A headlight parented to the camera plus a fill from above; a file
 // that brings its own KHR_lights_punctual lights adds to these.
@@ -215,7 +227,7 @@ document.getElementById('lights').addEventListener('change', (e) => {
 
 // --------------------------------------------------------- framing
 
-// Centre the model under the pivot and back the camera off so that
+// Centre the model on the origin and back the camera off so that
 // its bounding sphere fits the vertical field of view: a sphere of
 // radius r fills a field of view fov from a distance of
 // r / sin(fov / 2). The loader filled every geometry's bounding box
@@ -228,11 +240,18 @@ function frame(model) {
   model.position.set(-center.x, -center.y, -center.z);
   const halfFov = (camera.fov / 2) * (Math.PI / 180);
   const distance = (radius / Math.sin(halfFov)) * 1.1;
-  camera.position.set(0, radius * 0.25, distance);
+  // look from the front and a little above, and jump there at once
+  const { goal } = controls;
+  goal.target.set(0, 0, 0);
+  goal.distance = distance;
+  goal.yaw = 0;
+  goal.pitch = Math.atan2(radius * 0.25, distance);
+  controls.minDistance = distance / 20;
+  controls.maxDistance = distance * 4;
+  controls.snap();
   camera.near = distance / 100;
-  camera.far = distance + radius * 4;
+  camera.far = distance * 4 + radius * 2;
   camera.updateProjectionMatrix();
-  camera.lookAt(new Vector(0, 0, 0));
 }
 
 // --------------------------------------------------------- loading
@@ -278,7 +297,7 @@ function unload() {
     }
   });
   for (const texture of current.textures) renderer.dispose(texture);
-  pivot.remove(current.scene);
+  holder.remove(current.scene);
   current = null;
 }
 
@@ -292,10 +311,9 @@ async function show(name, load) {
     unload();
     current = result;
     // measure the model while it is still a root, so its own space
-    // is world space, then hang it off the (reset) pivot
+    // is world space, then hang it off the holder
     frame(result.scene);
-    pivot.rotation.set(0, 0, 0);
-    pivot.add(result.scene);
+    holder.add(result.scene);
     status.textContent = describe(name, result);
   } catch (error) {
     status.textContent = `${name}: ${error.message}`;
@@ -355,22 +373,7 @@ document.addEventListener('drop', (e) => {
   showDropped([...e.dataTransfer.files]);
 });
 
-// ----------------------------------------------------- interaction
-
-let dragging = null;
-let spin = true;
-canvas.addEventListener('pointerdown', (e) => {
-  dragging = { x: e.clientX, y: e.clientY };
-  spin = false;
-  canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  pivot.rotation.y += (e.clientX - dragging.x) * 0.01;
-  pivot.rotation.x += (e.clientY - dragging.y) * 0.01;
-  dragging = { x: e.clientX, y: e.clientY };
-});
-canvas.addEventListener('pointerup', () => (dragging = null));
+// ----------------------------------------------------- render loop
 
 function resize() {
   const { innerWidth: width, innerHeight: height } = window;
@@ -385,7 +388,7 @@ const clock = new Stopwatch().start();
 let last = 0;
 function tick() {
   const t = clock.elapsedTime / 1000;
-  if (spin) pivot.rotation.y += (t - last) * 0.3;
+  controls.update(t - last);
   last = t;
   renderer.render(scene, camera);
   requestAnimationFrame(tick);

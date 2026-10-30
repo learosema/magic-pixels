@@ -4,6 +4,7 @@ children:
   - ./core/index.md
   - ./gltf/index.md
   - ./rendering/index.md
+  - ./interaction/index.md
 ---
 
 # The magic pixels book
@@ -41,6 +42,11 @@ This is a detaled documentation that explains the core concepts of `magic-pixels
 - [Rendering to textures](./rendering/index.md)
 - [Render targets](./rendering/render-targets.md)
 - [Tone mapping](./rendering/tone-mapping.md)
+
+## Chapter 4: Interaction
+
+- [Interaction](./interaction/index.md)
+- [Orbit controls](./interaction/orbit-controls.md)
 
 ## Reading list
 

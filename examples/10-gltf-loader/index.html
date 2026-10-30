@@ -45,14 +45,23 @@
     </style>
   </head>
   <body>
+    <script type="importmap">
+      {
+        "imports": {
+          "magic-pixels": "../magic-pixels.js",
+          "magic-pixels/controls": "../magic-pixels-controls.js"
+        }
+      }
+    </script>
     <canvas id="canvas"></canvas>
     <div class="overlay">
       <div>
         <h1>glTF loader</h1>
         <p>
           <code>loadGltf(url)</code> turns a glTF file into a scene. Drag to
-          turn it, or drop your own <code>.glb</code> (or
-          <code>.gltf</code> with its <code>.bin</code> and images).
+          orbit, right-drag or two fingers to pan, wheel or pinch to zoom, or
+          drop your own <code>.glb</code> (or <code>.gltf</code> with its
+          <code>.bin</code> and images).
         </p>
         <div class="controls">
           <label
