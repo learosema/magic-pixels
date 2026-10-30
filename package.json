@@ -13,6 +13,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./controls": {
+      "types": "./dist/controls/index.d.ts",
+      "import": "./dist/controls.js"
+    },
     "./draco-worker": "./dist/draco-worker.js",
     "./meshopt-worker": "./dist/meshopt-worker.js"
   },
@@ -35,7 +39,7 @@
     "build:js": "node build",
     "build:docs": "typedoc && npm run build:examples -s && cp -R examples site/",
     "build": "rm -rf dist && npm run build:types -s && npm run build:js -s",
-    "build:examples": "npm run build:js -s && cp dist/index.js examples/magic-pixels.js && cp dist/draco-worker.js examples/draco-worker.js && cp dist/meshopt-worker.js examples/meshopt-worker.js",
+    "build:examples": "npm run build:js -s && cp dist/index.js examples/magic-pixels.js && cp dist/controls.js examples/magic-pixels-controls.js && cp dist/draco-worker.js examples/draco-worker.js && cp dist/meshopt-worker.js examples/meshopt-worker.js",
     "prepublishOnly": "npm run lint -s && npm test -s && npm run build && npm run lint:pkg -s"
   },
   "keywords": [

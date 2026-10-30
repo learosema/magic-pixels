@@ -1,68 +1,95 @@
-import { 
+import {
   AlphaMode,
   AmbientLight,
   createPlaneGeometry,
   createPbrMaterial,
   DirectionalLight,
-  Scene, 
+  Scene,
   Mesh,
   PerspectiveCamera,
   Stopwatch,
   Vector,
-  WebGL2Renderer, 
+  WebGL2Renderer,
   Wrapping,
   Filter,
-  Texture
+  Texture,
+  Box3,
 } from 'magic-pixels';
+import { OrbitControls } from 'magic-pixels/controls';
 
-import { pattern, normalPattern } from './patterns.js'
-import { createHouseKit } from './houses.js'
-import { createPostProcessing } from './post-processing.js'
-import { createRoads } from './roads.js'
-import { createForest } from './forest.js'
-import { createWater } from './water.js'
-import { createGroundMaterial } from './ground.js'
-import { OrbitControls } from './orbit-controls.js'
-import { createIsland, displacePlane } from './terrain.js'
+import { pattern, normalPattern } from './patterns.js';
+import { createHouseKit } from './houses.js';
+import { createPostProcessing } from './post-processing.js';
+import { createRoads } from './roads.js';
+import { createForest } from './forest.js';
+import { createWater } from './water.js';
+import { createGroundMaterial } from './ground.js';
+import { createIsland, displacePlane } from './terrain.js';
 
-const width = 256
-const height = 256
-const darkgrey = [.1,.1,.1]
-const grey = [.5, .5, .5]
-const white = [1., 1., 1.]
-const darkgreen = [.1, .2, .1]
-const green = [0.04, 0.7, 0.3]
-const orange = [.8, .4, .1];
-const brown = [.2, .1, .1];
-const lightyellow=[1., .8, .7]
-const smurf = [.2, .4, .8]
-const blue = [0, .2, .5]
-const darkblue = [0, .1, .2]
+const width = 256;
+const height = 256;
+const darkgrey = [0.1, 0.1, 0.1];
+const grey = [0.5, 0.5, 0.5];
+const white = [1, 1, 1];
+const darkgreen = [0.1, 0.2, 0.1];
+const green = [0.04, 0.7, 0.3];
+const orange = [0.8, 0.4, 0.1];
+const brown = [0.2, 0.1, 0.1];
+const lightyellow = [1, 0.8, 0.7];
+const smurf = [0.2, 0.4, 0.8];
+const blue = [0, 0.2, 0.5];
+const darkblue = [0, 0.1, 0.2];
 
 const assets = {
-  concrete: pattern(width, height, .125, grey),
+  concrete: pattern(width, height, 0.125, grey),
   // Normal maps of the buildings: the same noise as their colour patterns
   // (same freq, seed and octaves), so the bumps sit where the pattern is light
   // and dark. The strength is set per pattern: the slope of noise grows with
   // its frequency, so smooth low-frequency plaster takes more than concrete.
   plasterNormal: normalPattern(width, height, [0.06, 0.07], 4),
-  concreteNormal: normalPattern(width, height, .125, 2),
-  woodNormal: normalPattern(width, height, [.1, 0.01], 2),
-  whiteConcrete: pattern(width, height, .125, white),
+  concreteNormal: normalPattern(width, height, 0.125, 2),
+  woodNormal: normalPattern(width, height, [0.1, 0.01], 2),
+  whiteConcrete: pattern(width, height, 0.125, white),
   grassland: pattern(width, height, 0.04, green, darkgreen, darkgrey),
   // bumps at the scale of the colour pattern (same freq), so they follow the
   // mottling; the strength is raised because low-frequency noise is flat
   grassNormal: normalPattern(width, height, 0.04, 2.5, 8, 3),
   // warm grey rock, with strong light and dark
-  rock: pattern(width, height, .07, [.6, .56, .5], [.5, .4, .35], [.02, .02, .02], 5, 4),
-  beach: pattern(width, height, .18, [.95, .85, .6], [.2, .16, .1], [.1, .08, .05]),
-  wood: pattern(width, height, [.1, 0.01], orange, brown),
+  rock: pattern(
+    width,
+    height,
+    0.07,
+    [0.6, 0.56, 0.5],
+    [0.5, 0.4, 0.35],
+    [0.02, 0.02, 0.02],
+    5,
+    4
+  ),
+  beach: pattern(
+    width,
+    height,
+    0.18,
+    [0.95, 0.85, 0.6],
+    [0.2, 0.16, 0.1],
+    [0.1, 0.08, 0.05]
+  ),
+  wood: pattern(width, height, [0.1, 0.01], orange, brown),
   putz: pattern(width, height, [0.06, 0.07], lightyellow, grey, brown),
-  water: pattern(width, height, [.01, .05], smurf, blue, darkblue),
+  water: pattern(width, height, [0.01, 0.05], smurf, blue, darkblue),
 
   // the last argument fades the left and right edge out (an alpha mask), for the roads
-  sand: pattern(width, height, .12, [.9, .78, .5], [.25, .2, .12], [.08, .06, .03], 8, 2, .3),
-  bush: pattern(width, height, .25, darkgreen, green, darkgrey)
+  sand: pattern(
+    width,
+    height,
+    0.12,
+    [0.9, 0.78, 0.5],
+    [0.25, 0.2, 0.12],
+    [0.08, 0.06, 0.03],
+    8,
+    2,
+    0.3
+  ),
+  bush: pattern(width, height, 0.25, darkgreen, green, darkgrey),
 };
 
 // the patterns are colour images, so they are sRGB; mipmaps keep them calm
@@ -74,16 +101,30 @@ const loadTexture = (url, { repeat = false, linear = false } = {}) =>
     wrapS: repeat ? Wrapping.REPEAT : Wrapping.CLAMP_TO_EDGE,
     wrapT: repeat ? Wrapping.REPEAT : Wrapping.CLAMP_TO_EDGE,
     minFilter: Filter.LINEAR_MIPMAP_LINEAR,
-    magFilter: Filter.LINEAR
-  })
+    magFilter: Filter.LINEAR,
+  });
 
-const [grass, grassNormal, beach, rock, plaster, concrete, waterTexture, wood, sand, bush, plasterNormal, concreteNormal, woodNormal] = await Promise.all([
+const [
+  grass,
+  grassNormal,
+  beach,
+  rock,
+  plaster,
+  concrete,
+  waterTexture,
+  wood,
+  sand,
+  bush,
+  plasterNormal,
+  concreteNormal,
+  woodNormal,
+] = await Promise.all([
   loadTexture(assets.grassland, { repeat: true }),
   loadTexture(assets.grassNormal, { repeat: true, linear: true }),
   loadTexture(assets.beach, { repeat: true }),
   loadTexture(assets.rock, { repeat: true }),
   loadTexture(assets.putz),
-  loadTexture(assets.whiteConcrete, {repeat: true}),
+  loadTexture(assets.whiteConcrete, { repeat: true }),
   loadTexture(assets.water, { repeat: true }),
   loadTexture(assets.wood),
   loadTexture(assets.sand, { repeat: true }),
@@ -91,7 +132,7 @@ const [grass, grassNormal, beach, rock, plaster, concrete, waterTexture, wood, s
   loadTexture(assets.plasterNormal, { linear: true }),
   loadTexture(assets.concreteNormal, { repeat: true, linear: true }),
   loadTexture(assets.woodNormal, { linear: true }),
-])
+]);
 
 const canvas = document.querySelector('#canvas');
 const renderer = new WebGL2Renderer(canvas);
@@ -105,14 +146,23 @@ renderer.setClearColor(SKY);
 const CITY_SIZE = 40;
 
 // far enough to see the whole fading sea from anywhere the camera can go
-const camera = new PerspectiveCamera(25, innerWidth / innerHeight, .1, 400);
-// the camera lives in a rig that orbits the middle of the city; the rig is
-// what goes into the scene, so the camera is part of the scene graph
+const camera = new PerspectiveCamera(25, innerWidth / innerHeight, 0.1, 400);
+// the camera orbits the middle of the city, staying above the ground, and
+// the point it looks at may wander over the city but not out to sea
 const controls = new OrbitControls(camera, canvas, {
   distance: 45,
-  panLimit: CITY_SIZE / 2,
+  yaw: Math.PI / 4,
+  pitch: 0.45,
+  minDistance: 8,
+  maxDistance: 80,
+  minPitch: 0.05,
+  maxPitch: 1.5,
+  keyboard: true,
+  targetBounds: new Box3(
+    new Vector(-CITY_SIZE / 2, 0, -CITY_SIZE / 2),
+    new Vector(CITY_SIZE / 2, 0, CITY_SIZE / 2)
+  ),
 });
-scene.add(controls.rig);
 
 // The miniature look: the foreground melts into a blur while the middle stays
 // sharp. ?dof=0 in the address shows the plain picture, to compare.
@@ -151,7 +201,7 @@ const water = createWater({
   sky: SKY,
 });
 
-scene.add(floor, water.mesh)
+scene.add(floor, water.mesh);
 // the same random city on every load (Park-Miller), so a change of look can
 // be compared with the picture before it
 let seed = 7;
@@ -255,12 +305,12 @@ const forest = createForest({
 });
 scene.add(forest.object);
 
-const ambientLight = new AmbientLight('#2a3350', 0.5)
+const ambientLight = new AmbientLight('#2a3350', 0.5);
 scene.add(ambientLight);
 
 const sun = new DirectionalLight('#fff1d6', 1.2);
-sun.position.set(40,40,40);
-sun.lookAt(new Vector(0,0,0));
+sun.position.set(40, 40, 40);
+sun.lookAt(new Vector(0, 0, 0));
 scene.add(sun);
 
 const clock = new Stopwatch().start();
@@ -285,7 +335,7 @@ function animation() {
 
   // what is sharp is what the camera orbits around, at its distance
   if (post) {
-    post.render([scene, smokeScene], controls.state.distance);
+    post.render([scene, smokeScene], controls.current.distance);
   } else {
     renderer.render(scene, camera);
     renderer.autoClear = false;
@@ -293,12 +343,10 @@ function animation() {
     renderer.autoClear = true;
   }
 
-  requestAnimationFrame(animation)
+  requestAnimationFrame(animation);
 }
-
 
 resize();
 window.addEventListener('resize', resize, false);
 
 animation();
-

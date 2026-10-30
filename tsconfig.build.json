@@ -3,5 +3,10 @@
   "compilerOptions": {
     "emitDeclarationOnly": true
   },
-  "exclude": ["src/**/*.test.ts", "src/test-utils", "src/**/fixtures"]
+  "exclude": [
+    "src/api-docs.ts",
+    "src/**/*.test.ts",
+    "src/test-utils",
+    "src/**/fixtures"
+  ]
 }
